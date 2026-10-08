@@ -12,7 +12,7 @@ func (search *Search) groupNameContains(groupIdx int, lowerSub string) bool {
 	return false
 }
 
-// findVisibleItemsFromSub returns what the in-game search would show for a
+// FindVisibleItemsFromSub returns what the in-game search would show for a
 // substring: every member of any craftable group where some member's name matches
 func (search *Search) FindVisibleItemsFromSub(sub string) []string {
 	lowerSub := strings.ToLower(sub)
@@ -30,7 +30,7 @@ func (search *Search) FindVisibleItemsFromSub(sub string) []string {
 	return found
 }
 
-// isSameGroup checks if two items share a recipe group
+// IsSameGroup checks if two items share a recipe group
 func (search *Search) IsSameGroup(A, B string) bool {
 	gA, okA := search.itemGroupMap[A]
 	gB, okB := search.itemGroupMap[B]

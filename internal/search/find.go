@@ -2,7 +2,7 @@ package search
 
 import "strings"
 
-// findItemsFromSub returns all items found from a name substring
+// FindItemsFromSub returns all items found from a name substring
 // returns as full internal name e.g. item.minecraft.iron_axe
 func (search *Search) FindItemsFromSub(sub string) []string {
 	var found []string
@@ -14,7 +14,7 @@ func (search *Search) FindItemsFromSub(sub string) []string {
 	return found
 }
 
-// findCraftableItemsFromSub returns craftable items found from a name substring
+// FindCraftableItemsFromSub returns craftable items found from a name substring
 // take a word (slice of a name) and returns full internal name
 func (search *Search) FindCraftableItemsFromSub(sub string) []string {
 	var found []string

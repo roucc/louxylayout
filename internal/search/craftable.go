@@ -70,7 +70,7 @@ func canCraft(recipe data.Recipe, available map[string]bool) bool {
 	return true
 }
 
-// isCraftable is an O(1) lookup to check if an item is craftable
+// IsCraftable is an O(1) lookup to check if an item is craftable
 // requires full internal name e.g. item.minecraft.iron_axe
 func (search *Search) IsCraftable(item string) bool {
 	return search.craftableSet[item]

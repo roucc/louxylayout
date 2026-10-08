@@ -1,3 +1,4 @@
+// Package search is used for finding valid substrings and recipes
 package search
 
 import "louxylayout/internal/data"

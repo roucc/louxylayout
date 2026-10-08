@@ -1,3 +1,4 @@
+// Package data provides JSON data
 package data
 
 import (
