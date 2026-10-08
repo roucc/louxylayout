@@ -45,6 +45,8 @@ var Inventory = []string{
 	"item.minecraft.wheat",
 	"block.minecraft.blackstone",
 	"block.minecraft.oak_planks",
+	"block.minecraft.sandstone",
+	"block.minecraft.mossy_stone_bricks",
 }
 
 var Goals = []string{
