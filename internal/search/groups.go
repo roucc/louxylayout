@@ -17,7 +17,10 @@ func (search *Search) groupNameContains(groupIdx int, lowerSub string) bool {
 func (search *Search) FindVisibleItemsFromSub(sub string) []string {
 	lowerSub := strings.ToLower(sub)
 	var found []string
-	for groupIdx := range search.craftableGroupSize {
+	for groupIdx, size := range search.craftableGroupSize {
+		if size > search.gridSize() {
+			continue
+		}
 		if search.groupNameContains(groupIdx, lowerSub) {
 			for _, recipe := range search.RecipeGroups[groupIdx] {
 				found = append(found, recipe.Output)

@@ -3,6 +3,9 @@ package search
 import "louxylayout/internal/data"
 
 type Search struct {
+	// GridSize optionally overrides the crafting context (2 or 3).
+	// Zero uses inventory when the target fits, otherwise a crafting table.
+	GridSize           int
 	Items              map[string]string
 	RecipeGroups       [][]data.Recipe
 	craftableItems     []string

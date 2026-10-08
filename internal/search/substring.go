@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-const maxSubLen = 5
+const maxSubLen = 10
 
 // candidateNamesFor returns the names of every item in the target's recipe group
 // (or just the item's own name if it has no group)
@@ -23,10 +23,22 @@ func (search *Search) candidateNamesFor(targetItem string) []string {
 	return names
 }
 
-// targetGridSize returns the smallest grid the item can be crafted in (defaults to 3)
+// gridSize returns the grid for visibility queries without a target.
+func (search *Search) gridSize() int {
+	if search.GridSize != 0 {
+		return search.GridSize
+	}
+	return 3
+}
+
+// targetGridSize reuses the recipe index, with a minimum of the actual 2x2
+// inventory grid. A 1-slot recipe still shows competing 2x2 recipes.
 func (search *Search) targetGridSize(targetItem string) int {
+	if search.GridSize != 0 {
+		return search.GridSize
+	}
 	if size := search.itemMinSize[targetItem]; size != 0 {
-		return size
+		return max(2, size)
 	}
 	return 3
 }
@@ -60,7 +72,7 @@ func forEachCandidateSub(names []string, fn func(sub, lowerSub string)) {
 	}
 }
 
-// shortestUniqueSubstringForItem finds the shortest unique identifier for an item
+// ShortestUniqueSubstringForItem finds the shortest unique identifier for an item
 // if craftableOnly is true, uniqueness is only checked against search.craftableItems
 // otherwise all items in the game are checked
 // targetItem is full internal name e.g. item.minecraft.iron_axe
@@ -106,18 +118,53 @@ func (search *Search) ShortestUniqueSubstringForItem(targetItem string, craftabl
 }
 
 type SubResult struct {
-	Sub  string
-	Also []string // other goal items this substring also shows (empty = pure)
+	Sub         string
+	Also        []string // other goal items this substring also shows (empty = pure)
+	Unavoidable []string // otherwise-disallowed items every candidate also shows
 }
 
-// shortestUniqueSubstringWithJunk is craftable-only. Substrings that match other
-// craftable groups are still accepted if every matched group is a goal group
+// ShortestUniqueSubstringWithJunk is craftable-only. Substrings that match other
+// craftable groups are accepted if they are goals or unavoidable for this target.
 func (search *Search) ShortestUniqueSubstringWithJunk(targetItem string) []SubResult {
+	return search.substringsWithJunk(targetItem, true)
+}
+
+// JunklessSubstrings rejects other goal groups as well as avoidable non-goal
+// groups. Unavoidable matches are retained and reported in Unavoidable.
+func (search *Search) JunklessSubstrings(targetItem string) []SubResult {
+	return search.substringsWithJunk(targetItem, false)
+}
+
+func (search *Search) substringsWithJunk(targetItem string, allowGoodJunk bool) []SubResult {
 	targetSize := search.targetGridSize(targetItem)
 	targetGroup := search.targetGroupIdx(targetItem)
 
+	// A disallowed group is unavoidable when every candidate matches it.
+	unavoidable := make(map[int]bool)
+	for groupIdx, size := range search.craftableGroupSize {
+		_, isGoal := search.goalGroups[groupIdx]
+		if groupIdx != targetGroup && size <= targetSize && (!isGoal || !allowGoodJunk) {
+			unavoidable[groupIdx] = true
+		}
+	}
+	names := search.candidateNamesFor(targetItem)
+	forEachCandidateSub(names, func(_, lowerSub string) {
+		for groupIdx := range unavoidable {
+			if !search.groupNameContains(groupIdx, lowerSub) {
+				delete(unavoidable, groupIdx)
+			}
+		}
+	})
+	var unavoidableItems []string
+	for groupIdx := range unavoidable {
+		for _, recipe := range search.RecipeGroups[groupIdx] {
+			unavoidableItems = append(unavoidableItems, recipe.Output)
+		}
+	}
+	sort.Strings(unavoidableItems)
+
 	var results []SubResult
-	forEachCandidateSub(search.candidateNamesFor(targetItem), func(sub, lowerSub string) {
+	forEachCandidateSub(names, func(sub, lowerSub string) {
 		var also []string
 
 		for groupIdx, size := range search.craftableGroupSize {
@@ -128,14 +175,17 @@ func (search *Search) ShortestUniqueSubstringWithJunk(targetItem string) []SubRe
 				continue
 			}
 			goalItems, isGoal := search.goalGroups[groupIdx]
-			if !isGoal {
-				return // matches a non-goal group: reject
+			if unavoidable[groupIdx] {
+				continue
+			}
+			if !isGoal || !allowGoodJunk {
+				return // adds avoidable non-goal junk: reject
 			}
 			also = append(also, goalItems...)
 		}
 
 		sort.Strings(also) // map iteration order is random
-		results = append(results, SubResult{Sub: sub, Also: also})
+		results = append(results, SubResult{Sub: sub, Also: also, Unavoidable: unavoidableItems})
 	})
 
 	sort.SliceStable(results, func(i, j int) bool {
