@@ -20,12 +20,13 @@ type Transition struct {
 	To   string
 }
 
-// CraftGroup is an ordered crafting sequence. Priority scales the proximity
-// cost between consecutive crafts; zero disables the group. Groups may overlap.
+// CraftGroup is an unordered set of crafts performed together. Priority scales
+// proximity and sequence costs; zero disables the group. Groups may overlap.
 type CraftGroup struct {
 	Name     string
 	Priority float64
-	Crafts   []string // item IDs in crafting order
+	Crafts   []string            // item IDs; the planner chooses their order
+	Before   map[string][]string // source craft must be visited before each target
 }
 
 // Weights describes physical keys independently of their assigned characters.
@@ -47,9 +48,21 @@ type Weights struct {
 	Transitions map[Transition]float64
 	// Crafts weights goal importance by item ID. Unlisted goals have weight 1;
 	// a weight of zero excludes a goal from the total.
-	Crafts        map[string]float64
-	SearchEditing *SearchEditCosts // nil disables ordered search-edit planning
-	Groups        []CraftGroup
+	Crafts map[string]float64
+	// PreferredLayers describes the desired Shift state when clicking each craft.
+	// Unlisted crafts and AnyLayer have no preference. This configuration is
+	// used by shift-layer scoring.
+	PreferredLayers map[string]CraftLayer
+	// LayerPreferencePenalty charges for the wrong layer, scaled by craft
+	// priority. It is a soft cost, not a restriction; zero disables the preference.
+	LayerPreferencePenalty float64
+	// LayerSwitchPenalty is the cost of pressing or releasing Shift between crafts.
+	LayerSwitchPenalty float64
+	// PreferBothLayers charges per missing layer for these typed characters.
+	// All characters can occur on both layers; this is an optional extra preference.
+	PreferBothLayers map[rune]float64
+	SearchEditing    *SearchEditCosts // nil disables group order/search planning
+	Groups           []CraftGroup
 }
 
 // StringCost sums physical key efforts and consecutive-key transition costs.
@@ -114,29 +127,33 @@ func cheapestSearch(goal Goal, bindings Layout, weights Weights) (string, float6
 	return choice, best
 }
 
-// groupCost averages distances between all search-key pairs for each adjacent
-// pair of crafts. Missing or ignored crafts skip their incident edges, without
-// linking their neighbours. Searches remain each craft's cheapest typing choice.
+// groupCost pulls all active group members together, independently of their
+// configured list order. Scale the all-pairs sum by 2/n to retain n-1 edges'
+// worth of proximity cost when every pair has the same distance.
 func groupCost(bindings Layout, searches map[string]string, weights Weights) float64 {
 	total := 0.0
 	for _, group := range weights.Groups {
 		if group.Priority == 0 {
 			continue
 		}
-		for i := 1; i < len(group.Crafts); i++ {
-			from, to := []rune(strings.ToLower(searches[group.Crafts[i-1]])), []rune(strings.ToLower(searches[group.Crafts[i]]))
-			if len(from) == 0 || len(to) == 0 {
-				continue
+		var active [][]rune
+		for _, item := range uniqueGroupItems(group.Crafts) {
+			if sub := searches[item]; sub != "" {
+				active = append(active, []rune(strings.ToLower(sub)))
 			}
-			distance := 0.0
-			for _, a := range from {
-				first := weights.Keys[bindings[a]]
-				for _, b := range to {
-					second := weights.Keys[bindings[b]]
-					distance += math.Hypot(first.X-second.X, first.Y-second.Y)
+		}
+		for i, from := range active {
+			for _, to := range active[i+1:] {
+				distance := 0.0
+				for _, a := range from {
+					first := weights.Keys[bindings[a]]
+					for _, b := range to {
+						second := weights.Keys[bindings[b]]
+						distance += math.Hypot(first.X-second.X, first.Y-second.Y)
+					}
 				}
+				total += group.Priority * (2 / float64(len(active))) * distance / float64(len(from)*len(to))
 			}
-			total += group.Priority * distance / float64(len(from)*len(to))
 		}
 	}
 	return total
@@ -167,7 +184,7 @@ func score(bindings Layout, goals []Goal, weights Weights, missingPenalty float6
 	return total + groupCost(bindings, searches, weights), feasible
 }
 
-// Cost combines weighted typing effort with ordered craft-group proximity.
+// Cost combines weighted typing effort with unordered craft-group proximity.
 // All candidates are reconsidered on every call, including after swaps.
 func Cost(bindings Layout, goals []Goal, weights Weights) float64 {
 	total, _ := score(bindings, goals, weights, math.Inf(1))

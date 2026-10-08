@@ -8,9 +8,13 @@ import (
 	"louxylayout/internal/layout"
 	"louxylayout/internal/search"
 	"sort"
+	"time"
 )
 
 func main() {
+	started := time.Now()
+	weights := layout.KeyboardWeights
+	options := layout.OptimizeOptions{Seed: 42, Fixed: layout.Layout{' ': "Space"}, InitialBindings: layout.PreferredBindings, InitialShiftBindings: layout.PreferredShiftBindings, EnableShiftLayer: true}
 	groups, items, err := data.Load(config.Language)
 	if err != nil {
 		log.Fatal(err)
@@ -19,35 +23,6 @@ func main() {
 	fmt.Printf("Loaded %d recipe groups\n", len(groups))
 	fmt.Printf("Found %d craftable items\n", finder.CraftableCount())
 	fmt.Print("\n----------------------------------------------\n\n")
-
-	// find best crafts for specified goals
-	// for _, item := range config.Goals {
-	// 	var pure, junk []search.SubResult
-	// 	for _, r := range finder.ShortestUniqueSubstringWithJunk(item) {
-	// 		if len(r.Also) == 0 {
-	// 			pure = append(pure, r)
-	// 		} else {
-	// 			junk = append(junk, r)
-	// 		}
-	// 	}
-	//
-	// 	var p []string
-	// 	for _, r := range pure[:min(len(pure), 3)] {
-	// 		p = append(p, strings.ReplaceAll(r.Sub, " ", "_"))
-	// 	}
-	//
-	// 	var j []string
-	// 	for _, r := range junk[:min(len(junk), 3)] {
-	// 		var names []string
-	// 		for _, a := range r.Also {
-	// 			names = append(names, items[a])
-	// 		}
-	// 		j = append(j, fmt.Sprintf("%s (+ %s)", strings.ReplaceAll(r.Sub, " ", "_"), strings.Join(names, ", ")))
-	// 	}
-	//
-	// 	fmt.Printf("%s\n  pure:      [%s]\n  good junk: [%s]\n", item, strings.Join(p, ", "), strings.Join(j, "; "))
-	// 	fmt.Println()
-	// }
 
 	var goals []layout.Goal
 	for _, item := range config.Goals {
@@ -72,44 +47,81 @@ func main() {
 	fmt.Printf("Minimum characters (%d): %s\n", len(result.Characters), string(result.Characters))
 
 	// Optimize all original candidates, allowing the character set to change.
-	keys := make([]string, 0, len(layout.KeyboardWeights.Keys))
-	for key := range layout.KeyboardWeights.Keys {
+	keys := make([]string, 0, len(weights.Keys))
+	for key := range weights.Keys {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
-
-	optimized, err := layout.Optimize(goals, layout.KeyboardWeights, layout.OptimizeOptions{
-		Seed:              42,
-		Fixed:             layout.Layout{' ': "Space"},
-		InitialCharacters: result.Characters,
-		InitialBindings:   layout.PreferredBindings,
+	keyOrder := []string{"1", "2", "3", "4", "5", "Q", "W", "E", "R", "T", "A", "S", "D", "F", "G", "H", "Z", "X", "C", "V", "B", "Space"}
+	keyRank := make(map[string]int, len(keyOrder))
+	for i, key := range keyOrder {
+		keyRank[key] = i
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		first, knownFirst := keyRank[keys[i]]
+		second, knownSecond := keyRank[keys[j]]
+		if knownFirst != knownSecond {
+			return knownFirst
+		}
+		if knownFirst {
+			return first < second
+		}
+		return keys[i] < keys[j]
 	})
+
+	options.InitialCharacters = result.Characters
+	optimized, err := layout.Optimize(goals, weights, options)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	fmt.Printf("Layout generation time: %s\n", time.Since(started).Round(time.Millisecond))
+
 	bindings := optimized.Bindings
+	layered := layout.LayeredLayout{NonShift: optimized.Bindings, Shift: optimized.ShiftBindings}
 	keyCharacters := make(map[string]rune, len(bindings))
+	shiftCharacters := make(map[string]rune, len(optimized.ShiftBindings))
 	for ch, key := range bindings {
 		keyCharacters[key] = ch
 	}
-	fmt.Println("Rebindings (physical key → typed character):")
-	for _, key := range keys {
-		if ch, assigned := keyCharacters[key]; assigned {
-			if ch == ' ' {
-				fmt.Printf("  %s → Space\n", key)
-			} else {
-				fmt.Printf("  %s → %c\n", key, ch)
-			}
-		} else {
-			fmt.Printf("  %s → unassigned\n", key)
-		}
+	for ch, key := range optimized.ShiftBindings {
+		shiftCharacters[key] = ch
 	}
-	fmt.Printf("Optimized characters: %d\n", len(bindings))
+	describe := func(characters map[string]rune, key string) string {
+		ch, assigned := characters[key]
+		if !assigned {
+			return "unassigned"
+		}
+		if ch == ' ' {
+			return "Space"
+		}
+		return string(ch)
+	}
+	if optimized.ShiftBindings != nil {
+		fmt.Println("Rebindings (physical key → non-shift / shift character):")
+		for _, key := range keys {
+			fmt.Printf("  %s → %s / %s\n", key, describe(keyCharacters, key), describe(shiftCharacters, key))
+		}
+		fmt.Printf("Assigned characters: %d non-shift, %d shift\n", len(bindings), len(optimized.ShiftBindings))
+	} else {
+		fmt.Println("Rebindings (physical key → typed character):")
+		for _, key := range keys {
+			fmt.Printf("  %s → %s\n", key, describe(keyCharacters, key))
+		}
+		fmt.Printf("Assigned characters: %d\n", len(bindings))
+	}
 	fmt.Println("Cost:", optimized.Cost)
 	fmt.Println("Selected searches:")
-	for _, goal := range optimized.Searches {
-		fmt.Printf("  %s: %q\n", goal.Item, goal.Substrings)
+	if optimized.ShiftBindings == nil {
+		for _, goal := range optimized.Searches {
+			fmt.Printf("  %s: %q\n", goal.Item, goal.Substrings)
+		}
+	}
+	for _, choice := range optimized.LayeredSearches {
+		click := "click"
+		if choice.Layer == layout.ShiftLayer {
+			click = "shift-click"
+		}
+		fmt.Printf("  %s: %q (%s, type on %v, %s)\n", choice.Item, choice.Search, choice.Layer, choice.Keys, click)
 	}
 	if len(optimized.GroupPlans) > 0 {
 		fmt.Println("Group sequences (SH = Shift+Home, BS = Backspace):")
@@ -125,11 +137,22 @@ func main() {
 				case "keep":
 					operation = "keep "
 				}
+				if step.LayerChange {
+					change := "release Shift "
+					if step.Layer == layout.ShiftLayer {
+						change = "press Shift "
+					}
+					operation = change + operation
+				}
 				keys := make([]string, 0, len([]rune(step.Type)))
 				for _, ch := range step.Type {
-					keys = append(keys, bindings[ch])
+					keys = append(keys, layered.Bindings(step.Layer)[ch])
 				}
-				fmt.Printf("    %s: %s%q → %q (type on %v)\n", step.Item, operation, step.Type, step.Search, keys)
+				if step.Layer == layout.AnyLayer {
+					fmt.Printf("    %s: %s%q → %q (type on %v)\n", step.Item, operation, step.Type, step.Search, keys)
+				} else {
+					fmt.Printf("    %s: %s%q → %q (layer %s, type on %v)\n", step.Item, operation, step.Type, step.Search, step.Layer, keys)
+				}
 			}
 		}
 	}

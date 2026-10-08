@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"louxylayout/internal/config"
 	"louxylayout/internal/data"
 )
 
@@ -14,7 +13,10 @@ func TestBlazePowderRejectsLoomJunk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	finder := New(groups, items, config.Inventory, config.Goals)
+	finder := New(groups, items,
+		[]string{"item.minecraft.blaze_rod", "item.minecraft.string", "block.minecraft.oak_planks"},
+		[]string{"item.minecraft.blaze_powder"},
+	)
 	if !finder.IsCraftable("block.minecraft.loom") {
 		t.Fatal("fixture must include craftable loom")
 	}
@@ -40,7 +42,13 @@ func TestGlowstoneUsesInventoryGrid(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	finder := New(groups, items, config.Inventory, config.Goals)
+	finder := New(groups, items,
+		[]string{"item.minecraft.glowstone_dust", "item.minecraft.blaze_rod", "block.minecraft.cobblestone", "item.minecraft.stick", "item.minecraft.string"},
+		[]string{"item.minecraft.blaze_powder", "block.minecraft.glowstone", "item.minecraft.bow"},
+	)
+	if !finder.IsCraftable("block.minecraft.brewing_stand") {
+		t.Fatal("fixture must include the 3x3 brewing stand competing with glowstone's es search")
+	}
 	hasES := func() bool {
 		for _, result := range finder.ShortestUniqueSubstringWithJunk("block.minecraft.glowstone") {
 			if result.Sub == "es" {

@@ -9,25 +9,33 @@ import (
 )
 
 type OptimizeOptions struct {
-	Restarts          int
-	Iterations        int // attempted changes per restart
-	Seed              int64
-	Fixed             Layout          // characters that must stay on their supplied keys
-	InitialCharacters []rune          // a feasible starting character set
-	InitialBindings   map[string]rune // physical key -> typed character; first restart only, movable
+	Restarts             int
+	Iterations           int // attempted changes per restart
+	Seed                 int64
+	Fixed                Layout          // characters that must stay on their supplied keys
+	InitialCharacters    []rune          // a feasible starting character set
+	InitialBindings      map[string]rune // physical key -> typed character; first restart only, movable
+	EnableShiftLayer     bool
+	FixedShift           Layout
+	InitialShiftBindings map[string]rune
 }
 
 type Optimized struct {
-	Bindings   Layout
-	Cost       float64
-	Searches   []Goal      // one selected substring per craft, including search preferences
-	GroupPlans []GroupPlan // contextual searches and editing actions for each group
+	Bindings        Layout
+	Cost            float64
+	Searches        []Goal      // one selected substring per craft, including search preferences
+	GroupPlans      []GroupPlan // contextual searches and editing actions for each group
+	ShiftBindings   Layout      // nil in single-layer mode
+	LayeredSearches []LayeredSearch
 }
 
 // Optimize explores character sets and assignments using simulated annealing.
 // It keeps every goal and uses all candidates. Results are heuristic, not a
 // guarantee of the global minimum. Equal-cost results prefer fewer characters.
 func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized, error) {
+	if options.EnableShiftLayer {
+		return OptimizeLayers(goals, weights, options)
+	}
 	goals, err := WithPreferredSearches(goals, nil)
 	if err != nil {
 		return Optimized{}, err
@@ -90,6 +98,9 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 	}
 
 	for _, group := range weights.Groups {
+		if err := validateGroupOrder(group); err != nil {
+			return Optimized{}, err
+		}
 		if group.Priority < 0 || math.IsNaN(group.Priority) || math.IsInf(group.Priority, 0) {
 			return Optimized{}, fmt.Errorf("group %q priority must be finite and nonnegative", group.Name)
 		}
@@ -156,6 +167,12 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 		prepared = append(prepared, filtered)
 	}
 	sequence := newSequenceScorer(goals, weights)
+	if sequence.orderError != nil {
+		return Optimized{}, sequence.orderError
+	}
+	if sequence.invalid {
+		return Optimized{}, fmt.Errorf("groups support at most %d active unique crafts", maxGroupCrafts)
+	}
 	var fullAlphabet strings.Builder
 	fullAlphabet.WriteString(alphabet)
 	for _, text := range sequence.texts {

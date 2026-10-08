@@ -37,8 +37,8 @@ func TestFortressSearchOverlap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	steps := plans[0].Steps
-	if plans[0].Cost != 11.5 || steps[2].Search != "l " || steps[3].Action != "backspace" || steps[3].Backspaces != 1 || steps[3].Type != "ha" {
+	bed, pick := stepFor(plans[0], "bed"), stepFor(plans[0], "pick")
+	if plans[0].Cost != 11.5 || bed.Search != "l " || pick.Action != "backspace" || pick.Backspaces != 1 || pick.Type != "ha" {
 		t.Fatalf("expected l SPACE, BS, ha: %+v", plans[0])
 	}
 	assertSequenceReplay(t, plans[0], goals)
@@ -56,38 +56,38 @@ func TestBastionSearchOverlap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	steps := plans[0].Steps
-	if plans[0].Cost != 10 || steps[2].Type != "ø" || steps[3].Type != "sv" || steps[2].Backspaces != 1 || steps[3].Backspaces != 1 {
+	axe, sword := stepFor(plans[0], "axe"), stepFor(plans[0], "sword")
+	if plans[0].Cost != 10 || axe.Type != "ø" || sword.Type != "sv" || axe.Backspaces != 1 || sword.Backspaces != 1 {
 		t.Fatalf("expected rnb, BS, ø, BS, sv: %+v", plans[0])
 	}
 	assertSequenceReplay(t, plans[0], goals)
 }
 
 func TestSequenceControlsAndRestrictions(t *testing.T) {
-	goals := []Goal{{Item: "one", Substrings: []string{"abc"}}, {Item: "two", Substrings: []string{"abd", "z"}}}
+	goals := []Goal{{Item: "one", Substrings: []string{"abc"}}, {Item: "two", Substrings: []string{"abd"}}}
 	bindings, weights := sequenceFixture(goals)
 	weights.SearchEditing.ShiftHome = 10
 	plans, err := PlanGroups(bindings, goals, weights)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if step := plans[0].Steps[1]; step.Search != "abd" || step.Backspaces != 1 || step.Type != "d" {
-		t.Fatalf("expected reuse: %+v", step)
+	if plans[0].Cost != 4.5 || plans[0].Steps[1].Backspaces != 1 {
+		t.Fatalf("expected prefix reuse: %+v", plans[0])
 	}
 	weights.SearchEditing.Backspace = 100
 	plans, err = PlanGroups(bindings, goals, weights)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if step := plans[0].Steps[1]; step.Search != "z" || step.Action != "shift-home" {
-		t.Fatalf("expected replacement: %+v", step)
+	if plans[0].Cost != 16 || plans[0].Steps[1].Action != "shift-home" {
+		t.Fatalf("expected replacement: %+v", plans[0])
 	}
 	goals[1].PreferredSubstrings = []string{"abd"}
 	plans, err = PlanGroups(bindings, goals, weights)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plans[0].Steps[1].Search != "abd" {
+	if stepFor(plans[0], "two").Search != "abd" {
 		t.Fatal("plan ignored search restriction")
 	}
 	delete(bindings, 'd')
@@ -107,9 +107,8 @@ func TestSequenceAppendKeepAndDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	steps := plans[0].Steps
-	if steps[1].Type != "a" || steps[1].Backspaces != 0 || steps[2].Action != "keep" || steps[3].Backspaces != 1 || steps[3].Type != "" || plans[0].Cost != 2.5 {
-		t.Fatalf("unexpected append/keep/delete: %+v", plans[0])
+	if plans[0].Cost != 2 || plans[0].Steps[1].Action != "keep" || plans[0].Steps[2].Type != "a" || plans[0].Steps[3].Action != "keep" {
+		t.Fatalf("order should put identical searches together and avoid deletion: %+v", plans[0])
 	}
 	assertSequenceReplay(t, plans[0], goals)
 	weights.Groups[0].Crafts = []string{"one", "missing", "two"}
@@ -117,14 +116,14 @@ func TestSequenceAppendKeepAndDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if plans[0].Steps[1].Type != "øa" || plans[0].Steps[1].Action != "type" || plans[0].Cost != 3 {
-		t.Fatalf("missing craft must break overlap: %+v", plans[0])
+	if plans[0].Steps[1].Type != "a" || plans[0].Steps[1].Action != "type" || plans[0].Cost != 2 {
+		t.Fatalf("missing craft must be omitted: %+v", plans[0])
 	}
 	weights.Groups[0].Crafts = []string{"one", "three", "two"}
 	weights.Crafts = map[string]float64{"three": 0}
 	plans, err = PlanGroups(bindings, goals, weights)
-	if err != nil || plans[0].Cost != 3 {
-		t.Fatalf("ignored craft must break overlap: %+v, %v", plans, err)
+	if err != nil || plans[0].Cost != 2 {
+		t.Fatalf("ignored craft must be omitted: %+v, %v", plans, err)
 	}
 }
 
@@ -171,7 +170,7 @@ func TestSequenceDPMatchesExhaustive(t *testing.T) {
 	}
 }
 
-func exhaustiveSequenceCost(goals []Goal, bindings Layout, weights Weights) float64 {
+func exhaustiveOrderedSequenceCost(goals []Goal, bindings Layout, weights Weights) float64 {
 	var visit func(int, string) float64
 	visit = func(stage int, previous string) float64 {
 		if stage == len(goals) {
@@ -261,7 +260,7 @@ func TestOptimizeSequenceCostAndCharacterRetention(t *testing.T) {
 }
 
 func TestOptimizeRetainsCharactersUsedOnlyInGroupPlan(t *testing.T) {
-	goals := []Goal{{Item: "one", Substrings: []string{"xx", "xxy"}}, {Item: "two", Substrings: []string{"z", "xxyz"}}}
+	goals := []Goal{{Item: "one", Substrings: []string{"xx", "xxy"}}, {Item: "two", Substrings: []string{"zz", "xxyz"}}}
 	_, weights := sequenceFixture(goals)
 	weights.SearchEditing.ShiftHome = 100
 	got, err := Optimize(goals, weights, OptimizeOptions{Restarts: 2, Iterations: 100, Seed: 42})
@@ -271,16 +270,16 @@ func TestOptimizeRetainsCharactersUsedOnlyInGroupPlan(t *testing.T) {
 	if _, ok := got.Bindings['y']; !ok {
 		t.Fatalf("group-only character y was removed: %+v", got)
 	}
-	if got.Cost != 7 || got.Cost != Cost(got.Bindings, goals, weights) {
-		t.Fatalf("expected standalone cost 3 + sequence cost 4: %+v", got)
+	if got.Cost != 8 || got.Cost != Cost(got.Bindings, goals, weights) {
+		t.Fatalf("expected standalone cost 4 + sequence cost 4: %+v", got)
 	}
-	if got.GroupPlans[0].Steps[1].Search != "xxyz" {
+	if stepFor(got.GroupPlans[0], "two").Search != "xxyz" {
 		t.Fatalf("expected overlap search xxyz: %+v", got.GroupPlans)
 	}
 }
 
 func TestSequenceRejectsTwoBackspaces(t *testing.T) {
-	goals := []Goal{{Item: "one", Substrings: []string{"abcd"}}, {Item: "two", Substrings: []string{"ab"}}}
+	goals := []Goal{{Item: "one", Substrings: []string{"abcx"}}, {Item: "two", Substrings: []string{"abdy"}}}
 	bindings, weights := sequenceFixture(goals)
 	weights.SearchEditing.ShiftHome = 100
 	plans, err := PlanGroups(bindings, goals, weights)
@@ -288,7 +287,84 @@ func TestSequenceRejectsTwoBackspaces(t *testing.T) {
 		t.Fatal(err)
 	}
 	step := plans[0].Steps[1]
-	if step.Action != "shift-home" || step.Backspaces != 0 || step.Type != "ab" || plans[0].Cost != 106 {
+	if step.Action != "shift-home" || step.Backspaces != 0 || len([]rune(step.Type)) != 4 || plans[0].Cost != 108 {
 		t.Fatalf("two Backspaces must never be used, even when cheaper: %+v", plans[0])
+	}
+}
+
+func exhaustiveSequenceCost(goals []Goal, bindings Layout, weights Weights) float64 {
+	best := math.Inf(1)
+	var visit func(int)
+	ordered := append([]Goal(nil), goals...)
+	visit = func(i int) {
+		if i == len(ordered) {
+			best = math.Min(best, exhaustiveOrderedSequenceCost(ordered, bindings, weights))
+			return
+		}
+		for j := i; j < len(ordered); j++ {
+			ordered[i], ordered[j] = ordered[j], ordered[i]
+			visit(i + 1)
+			ordered[i], ordered[j] = ordered[j], ordered[i]
+		}
+	}
+	visit(0)
+	return best
+}
+
+func stepFor(plan GroupPlan, item string) CraftStep {
+	for _, step := range plan.Steps {
+		if step.Item == item {
+			return step
+		}
+	}
+	return CraftStep{}
+}
+
+func TestGroupOrderIgnoresConfiguredOrder(t *testing.T) {
+	goals := []Goal{{Item: "long", Substrings: []string{"abcd"}}, {Item: "short", Substrings: []string{"ab"}}, {Item: "other", Substrings: []string{"abd"}}}
+	bindings, weights := sequenceFixture(goals)
+	plans, err := PlanGroups(bindings, goals, weights)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plans[0].Cost != exhaustiveSequenceCost(goals, bindings, weights) {
+		t.Fatalf("did not choose cheapest order: %+v", plans[0])
+	}
+	// Including the same craft twice still means crafting it once.
+	weights.Groups[0].Crafts = []string{"other", "long", "short", "long"}
+	reordered, err := PlanGroups(bindings, goals, weights)
+	if err != nil || !reflect.DeepEqual(plans, reordered) {
+		t.Fatalf("list order or duplicates affected plan: %+v, %+v, %v", plans, reordered, err)
+	}
+	assertSequenceReplay(t, plans[0], goals)
+	seen := make(map[string]bool)
+	for _, step := range plans[0].Steps {
+		if seen[step.Item] {
+			t.Fatalf("craft visited twice: %s", step.Item)
+		}
+		seen[step.Item] = true
+	}
+	if len(seen) != len(goals) {
+		t.Fatalf("plan omitted crafts: %+v", plans[0])
+	}
+}
+
+func TestGroupPlanningSizeLimit(t *testing.T) {
+	goals := make([]Goal, maxGroupCrafts+1)
+	for i := range goals {
+		goals[i] = Goal{Item: string(rune('a' + i)), Substrings: []string{"x"}}
+	}
+	bindings, weights := sequenceFixture(goals)
+	if _, err := PlanGroups(bindings, goals, weights); err == nil {
+		t.Fatal("oversized exact planning should fail explicitly")
+	}
+	if _, err := Optimize(goals, weights, OptimizeOptions{}); err == nil {
+		t.Fatal("optimizer should reject oversized group")
+	}
+	// Ignored members do not count toward the active group size limit.
+	weights.Crafts = map[string]float64{goals[len(goals)-1].Item: 0}
+	plans, err := PlanGroups(bindings, goals, weights)
+	if err != nil || len(plans[0].Steps) != maxGroupCrafts {
+		t.Fatalf("active craft count mismatch: %+v, %v", plans, err)
 	}
 }

@@ -1,189 +1,20 @@
-# TODO:
-shift layer
-
 # Louxy Layout
 
-A Go tool for optimizing Minecraft search-crafting keyboard layouts.
+A Go tool for optimizing Minecraft search-crafting keyboard layouts. Run `go run .`.
 
-Run the layout optimizer with `go run .`, or build an executable with `go build .`.
-The report shows the minimum character set, optimized physical key bindings,
-weighted cost, and the selected search for each craft. Lower cost is better.
+Groups are unordered: the optimizer jointly chooses craft order and searches,
+using shared-prefix indexes and a visited-craft mask. `CraftGroup.Before` adds
+precedence rules without adding states. Missing/ignored crafts are omitted.
+Exact planning supports up to ten active unique crafts per group. Each transition
+allows at most one Backspace; longer deletions use Shift+Home.
 
-## Structure
+`OptimizeOptions.EnableShiftLayer` enables independent assignments on both layers.
+Physical key effort, fingers, distances and transitions are shared. Craft layer
+preferences are soft costs; unlisted goals can use either layer. Characters can
+appear on both layers, and `PreferBothLayers` encourages important duplicates.
+Each complete search uses one layer throughout, with its Shift state retained
+for the craft click. Group plans also choose layers and Shift changes.
 
-- `main.go`: loads data, constructs the search engine, and prints results.
-- `internal/config/defaults.go`: language, inventory, and crafting goals.
-- `internal/data/data.go`: recipe types and embedded JSON loading.
-- `internal/data/recipes.json`: recipe groups and ingredients.
-- `internal/data/lang/`: language JSON and reference tooltip JavaScript.
-- `internal/search/search.go`: search state and constructor.
-- `internal/search/craftable.go`: inventory checks and craftability indexes.
-- `internal/search/groups.go`: group matching and visibility.
-- `internal/search/substring.go`: substring generation, pure searches, and good junk.
-- `internal/search/find.go`: direct item-name lookup helpers.
-
-Add search helpers in more files with `package search` in `internal/search`.
-Layout selection and scoring live in `internal/layout`:
-
-- `layout.go`: exact minimum-character selection and random assignments.
-- `keyboard.go`: editable key efforts, finger assignments, transition penalties,
-  craft priorities, and ordered craft groups. Unlisted craft priorities default to 1; zero ignores a craft.
-- `cost.go`: combines weighted typing costs with craft-group proximity costs.
-- `optimize.go`: tries character swaps, moves, additions, replacements, and removals
-  across random starts. This is a heuristic search, not a global optimum guarantee.
-
-Tune `OptimizeOptions` in `main.go` for the seed, restarts, and iterations.
-Space remains bound to the physical Space key. The minimum character set seeds
-optimization; all original valid candidates remain available, allowing larger sets.
-
-`config.AllowGoodJunk` defaults to false, rejecting avoidable matches with other
-goal crafts. Unavoidable matches remain allowed in either mode. Candidate filtering
-uses the 2x2 inventory grid when the target fits, otherwise the 3x3 table. Set
-`Search.GridSize` to 2 or 3 to override the context.
-
-Set `config.Language` to `"en_gb"` for English, `"no_no"` for Norwegian, or
-`"ovd"` for Elfdalian. Language JSON is embedded
-at build time. Search state is constructed explicitly with `search.New`,
-allowing separate inventories, languages, and goal lists. Treat the recipe
-groups and item-name map passed to the constructor as read-only.
-
-## Craft groups
-
-Add ordered sequences to `KeyboardWeights.Groups` in `internal/layout/keyboard.go`:
-
-```go
-Groups: []CraftGroup{
-    {
-        Name: "fortress",
-        Priority: 3,
-        Crafts: []string{
-            "item.minecraft.bow",
-            "block.minecraft.respawn_anchor",
-            "block.minecraft.white_bed",
-            "item.minecraft.golden_pickaxe",
-        },
-    },
-},
-```
-
-Higher `Priority` gives the optimizer more incentive to put consecutive crafts'
-search keys nearby. Zero disables a group. Crafts can appear in multiple groups;
-their penalties add together. Individual `Crafts` priorities still control typing
-effort independently. Groups use existing goals; they do not add crafting goals.
-Absent goals and crafts with individual priority zero skip their incident pairs
-without joining their neighbours.
-
-Each craft uses its cheapest search among its allowed candidates (ties choose alphabetically). For each
-consecutive pair in a group, the proximity penalty is `Priority` times the average
-Euclidean distance between all keys in the two searches. `KeyWeight.X` and `Y`
-define physical positions in key-width units, including approximate row stagger.
-A priority of 3 therefore adds 3 cost units for a pair of single-key searches one
-key-width apart. This is a soft preference: shared letters and typing effort can
-prevent every group from fitting together. Search choices minimize typing effort among allowed searches;
-group proximity then guides physical key assignment.
-
-## Comfort within a craft
-
-Tune these values in `KeyboardWeights` (both default to 1):
-
-```go
-DistancePenalty:    1,
-FingerReusePenalty: 1,
-```
-
-`DistancePenalty` charges per key-width travelled between consecutive presses,
-so a jump from C to 2 costs more than C to X. `FingerReusePenalty` charges for
-all pairs of presses using the same named finger in a search: X → C → 2 reuses
-the middle finger, even though those presses are separated. Repeated characters
-also incur this penalty. Empty finger assignments skip the finger penalty.
-
-These penalties add to key effort and the existing transition costs, including
-explicit transition overrides. `SameFingerPenalty` still applies only to default
-consecutive transitions. The craft priority multiplies the entire search cost,
-so a priority-5 craft pays five times each comfort penalty. Raise `DistancePenalty`
-to prefer nearby keys, or `FingerReusePenalty` to prefer different fingers; zero
-disables either. Priorities remain soft preferences across the whole layout.
-Physical key distances are precomputed once during optimization for speed.
-
-## Optional user preferences
-
-Set `PreferredSearches` in `internal/config/defaults.go` to restrict a goal to
-one or more valid searches. An empty map or empty list allows all valid searches:
-
-```go
-var PreferredSearches = map[string][]string{
-    "block.minecraft.white_bed": {"l ", "n "}, // Norwegian
-}
-```
-
-The optimizer uses only the listed searches for that goal and chooses the
-cheapest typeable one. They must be valid candidates for the selected language,
-inventory and `AllowGoodJunk` setting. Invalid searches and unknown goal IDs
-produce a configuration error; spaces are significant and case is ignored.
-Restrictions apply to minimum-character selection, optimization and reporting.
-If none of the allowed searches can be typed, that goal is unreachable.
-
-Set `PreferredBindings` in `internal/layout/keyboard.go` to start the first
-optimizer restart with familiar key positions:
-
-```go
-var PreferredBindings = map[string]rune{
-    "A": 'N',                       // A types N
-    "Q": 'L', "W": 'H', "E": 'A', // QWE types LHA
-}
-```
-
-This maps physical keys to their rebound typed characters. Uppercase and lowercase characters
-are accepted. The remaining starting characters are placed randomly on unused
-keys, and later restarts explore random layouts. These bindings can move or be
-removed during optimization; they seed the search without adding a scoring
-penalty. Use `OptimizeOptions.Fixed` for bindings that must stay in place.
-Duplicate typed characters, unknown physical keys and conflicts with fixed bindings produce
-configuration errors. Leave the map empty for the usual random starts.
-
-## Backspace overlap between crafts
-
-Ordered groups can select searches together, so the next craft can reuse a
-prefix of the previous search. Configure the costs of your existing controls in
-`KeyboardWeights`:
-
-```go
-SearchEditing: &SearchEditCosts{
-    ShiftHome: 1,
-    Backspace: 0.5,
-},
-```
-
-These are action costs, not new bindings. Home on MB4 and Backspace on MB5 stay
-outside the layout assignments. `ShiftHome` includes selecting the entire old
-search before typing its replacement. `Backspace` is the cost of deleting one character. Each transition permits at
-most one Backspace; two or more deletions require Shift+Home. Set `SearchEditing` to `nil` to disable overlap planning.
-
-For a transition from `l ` to `lha`, the planner compares:
-
-- `SH lha`: select the whole search and type all three characters.
-- `BS ha`: delete the trailing space, keep `l`, and type only `ha`.
-
-It chooses searches across the complete group rather than greedily choosing each
-craft. It can use a longer valid search when its prefix helps the following
-craft, append without deleting, delete without typing, or keep an identical
-search. A deletion removes one Unicode character, so `ø` takes one Backspace. Each
-segment starts with an empty search and the cursor at the end; missing or ignored
-crafts break the chain. Typing costs apply only to newly typed text, with finger
-reuse counted within that new text. Mouse actions are charged their configured
-costs, without keyboard travel or cross-action finger penalties.
-
-Scoring keeps standalone craft typing costs and the existing proximity penalty,
-then adds each group's `Priority` times its cheapest editing sequence cost.
-This lets the layout support both individual crafts and repeated sequences.
-The optimizer uses every allowed group candidate, while retaining pruning for
-standalone searches. Shared-prefix indexes and typing costs are precomputed or
-cached to avoid comparing every candidate pair at each iteration.
-
-The report prints standalone searches separately from each group's chosen
-searches and actions, including physical keys for newly typed text. A craft can
-use a different search in different groups. `PreferredSearches` restrictions
-apply to every plan. Search validity still follows the configured inventory,
-grid and junk policy; planning does not simulate inventory changes from actually
-performing the crafts. With `AllowGoodJunk = false`, a shortcut rejected by the
-candidate generator cannot be used even if its prefix overlaps.
+The CLI prints keyboard rows, both layers, selected searches, group plans and
+layout generation time. Set language, inventory and goals in `internal/config`;
+keyboard and craft costs are in `internal/layout/keyboard.go`.

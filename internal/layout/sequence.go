@@ -15,12 +15,14 @@ type SearchEditCosts struct {
 }
 
 type CraftStep struct {
-	Item       string
-	Search     string // complete search visible after this step
-	Action     string // type, shift-home, backspace, or keep
-	Backspaces int
-	Type       string // only the new text to type
-	Cost       float64
+	Item        string
+	Search      string // complete search visible after this step
+	Action      string // type, shift-home, backspace, or keep
+	Backspaces  int
+	Type        string // only the new text to type
+	Cost        float64
+	Layer       CraftLayer // typing and crafting-click layer; empty in single-layer mode
+	LayerChange bool       // press or release Shift before this craft
 }
 
 type GroupPlan struct {
@@ -31,46 +33,55 @@ type GroupPlan struct {
 }
 
 type sequenceCandidate struct {
-	search   string
-	text     int
-	length   int
-	prefixes []int
-	incoming []int
-	suffixes []int
+	search              string
+	text, length, stage int
+	layer               int
+	penalty             float64
+	outgoing            []int // full search and search without its last rune
+	incoming            []int // every prefix of this search
+	suffixes            []int
 }
 
 type sequenceStage struct {
-	item        string
-	reset       bool // no active immediately preceding craft
-	candidates  []sequenceCandidate
-	prefixCount int
+	item          string
+	start, end    int
+	prerequisites int   // required visited crafts, checked using the existing mask
+	active        []int // typeable candidate indexes, reused across evaluations
 }
 
 type sequenceGroup struct {
-	group  CraftGroup
-	stages []sequenceStage
+	group       CraftGroup
+	stages      []sequenceStage
+	candidates  []sequenceCandidate
+	prefixCount int
+	dp          []float64
 }
 
-// sequenceScorer compiles prefix indexes and suffixes once. For a prefix of
-// length k, the best predecessor is min(previous cost + length*Backspace).
-// This avoids comparing every candidate against every preceding candidate.
+// Exact subset planning considers craft order and search choice together. The
+// prefix minima avoid comparing every predecessor candidate with every next one.
+const maxGroupCrafts = 10
+
 type sequenceScorer struct {
-	weights                     Weights
-	texts                       []string
-	groups                      []sequenceGroup
-	costs                       []float64
-	stamps                      []uint64
-	generation                  uint64
-	characters                  []rune
-	textCharacters              [][]int
-	keyIDs                      map[string]int
-	characterKeys               []int
-	efforts                     []float64
-	fingers                     []int
-	fingerCounts                []int
-	transitions                 []float64
-	distances                   []float64
-	previous, next, prefixCosts []float64
+	weights            Weights
+	texts              []string
+	groups             []sequenceGroup
+	costs              []float64
+	stamps             []uint64
+	generation         uint64
+	characters         []rune
+	textCharacters     [][]int
+	keyIDs             map[string]int
+	characterKeys      []int
+	efforts            []float64
+	fingers            []int
+	fingerCounts       []int
+	transitions        []float64
+	distances          []float64
+	prefixCosts        []float64
+	invalid            bool
+	orderError         error
+	layered            bool
+	layerCharacterKeys [2][]int
 }
 
 func newSequenceScorer(goals []Goal, weights Weights) *sequenceScorer {
@@ -95,21 +106,25 @@ func newSequenceScorer(goals []Goal, weights Weights) *sequenceScorer {
 		scorer.texts = append(scorer.texts, text)
 		return id
 	}
-	maxCandidates, maxPrefixes := 0, 0
+	maxPrefixes := 0
 	for _, group := range weights.Groups {
 		if group.Priority == 0 {
 			continue
 		}
+		if err := validateGroupOrder(group); err != nil {
+			scorer.orderError = err
+			return scorer
+		}
 		compiled := sequenceGroup{group: group}
-		previousActive := false
-		for _, item := range group.Crafts {
+		items := uniqueGroupItems(group.Crafts)
+		for _, item := range items {
 			goal, active := byItem[item]
 			if !active {
-				previousActive = false
 				continue
 			}
-			stage := sequenceStage{item: item, reset: !previousActive}
+			stage := sequenceStage{item: item, start: len(compiled.candidates)}
 			seen := make(map[string]bool)
+			var candidates []sequenceCandidate
 			for _, sub := range goal.Substrings {
 				if sub == "" || len(goal.PreferredSubstrings) > 0 && !preferredSearch(goal, sub) {
 					continue
@@ -120,69 +135,98 @@ func newSequenceScorer(goals []Goal, weights Weights) *sequenceScorer {
 				}
 				seen[lower] = true
 				runes := []rune(lower)
-				candidate := sequenceCandidate{search: lower, text: intern(lower), length: len(runes)}
+				candidate := sequenceCandidate{search: lower, text: intern(lower), length: len(runes), stage: len(compiled.stages)}
 				for k := 1; k <= len(runes); k++ {
 					candidate.suffixes = append(candidate.suffixes, intern(string(runes[k:])))
 				}
-				stage.candidates = append(stage.candidates, candidate)
+				candidates = append(candidates, candidate)
 			}
-			sort.Slice(stage.candidates, func(i, j int) bool { return stage.candidates[i].search < stage.candidates[j].search })
+			sort.Slice(candidates, func(i, j int) bool { return candidates[i].search < candidates[j].search })
+			compiled.candidates = append(compiled.candidates, candidates...)
+			stage.end = len(compiled.candidates)
+			stage.active = make([]int, 0, len(candidates))
 			compiled.stages = append(compiled.stages, stage)
-			previousActive = true
 		}
-		for i := range compiled.stages {
-			stage := &compiled.stages[i]
-			maxCandidates = max(maxCandidates, len(stage.candidates))
-			if stage.reset {
+		stageIndex := make(map[string]int, len(compiled.stages))
+		for i, stage := range compiled.stages {
+			stageIndex[stage.item] = i
+		}
+		for before, targets := range group.Before {
+			from, active := stageIndex[before]
+			if !active {
 				continue
 			}
-			prefixIDs := make(map[string]int)
-			previous := &compiled.stages[i-1]
-			for c := range previous.candidates {
-				candidate := &previous.candidates[c]
-				runes := []rune(candidate.search)
-				for k := 1; k <= len(runes); k++ {
-					prefix := string(runes[:k])
-					id, ok := prefixIDs[prefix]
-					if !ok {
-						id = len(prefixIDs)
-						prefixIDs[prefix] = id
-					}
-					candidate.prefixes = append(candidate.prefixes, id)
+			for _, after := range targets {
+				if to, active := stageIndex[after]; active {
+					compiled.stages[to].prerequisites |= 1 << from
 				}
 			}
-			// Separate incoming indexes from outgoing indexes: each edge has its own trie.
-			for c := range stage.candidates {
-				candidate := &stage.candidates[c]
-				runes := []rune(candidate.search)
-				for k := 1; k <= len(runes); k++ {
-					id, ok := prefixIDs[string(runes[:k])]
-					if !ok {
-						id = -1
-					}
-					candidate.incoming = append(candidate.incoming, id)
-				}
-			}
-			stage.prefixCount = len(prefixIDs)
-			maxPrefixes = max(maxPrefixes, len(prefixIDs))
 		}
+		if len(compiled.stages) > maxGroupCrafts {
+			scorer.invalid = true
+			return scorer
+		}
+		prefixes := make(map[string]int)
+		for c := range compiled.candidates {
+			candidate := &compiled.candidates[c]
+			runes := []rune(candidate.search)
+			for k := max(1, len(runes)-1); k <= len(runes); k++ {
+				prefix := string(runes[:k])
+				id, ok := prefixes[prefix]
+				if !ok {
+					id = len(prefixes)
+					prefixes[prefix] = id
+				}
+				candidate.outgoing = append(candidate.outgoing, id)
+			}
+		}
+		for c := range compiled.candidates {
+			candidate := &compiled.candidates[c]
+			runes := []rune(candidate.search)
+			for k := 1; k <= len(runes); k++ {
+				id, ok := prefixes[string(runes[:k])]
+				if !ok {
+					id = -1
+				}
+				candidate.incoming = append(candidate.incoming, id)
+			}
+		}
+		compiled.prefixCount = len(prefixes)
+		maxPrefixes = max(maxPrefixes, compiled.prefixCount)
+		compiled.dp = make([]float64, (1<<len(compiled.stages))*len(compiled.candidates))
 		scorer.groups = append(scorer.groups, compiled)
 	}
 	scorer.costs = make([]float64, len(scorer.texts))
 	scorer.stamps = make([]uint64, len(scorer.texts))
-	scorer.previous = make([]float64, maxCandidates)
-	scorer.next = make([]float64, maxCandidates)
 	scorer.prefixCosts = make([]float64, maxPrefixes)
 	scorer.compileTyping()
 	return scorer
+}
+
+// Sorting and deduplication ensure configured list order cannot affect the plan.
+func uniqueGroupItems(items []string) []string {
+	seen := make(map[string]bool, len(items))
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		if !seen[item] {
+			result = append(result, item)
+			seen[item] = true
+		}
+	}
+	sort.Strings(result)
+	return result
 }
 
 func (s *sequenceScorer) textCost(id int, bindings Layout) float64 {
 	if s.stamps[id] != s.generation {
 		cost, previous := 0.0, -1
 		clear(s.fingerCounts)
-		for _, character := range s.textCharacters[id] {
-			key := s.characterKeys[character]
+		keys := s.characterKeys
+		if s.layered {
+			keys = s.layerCharacterKeys[id/len(s.texts)]
+		}
+		for _, character := range s.textCharacters[id%len(s.texts)] {
+			key := keys[character]
 			if key < 0 {
 				cost = math.Inf(1)
 				break
@@ -211,6 +255,9 @@ func (s *sequenceScorer) evaluate(bindings Layout, report bool) (float64, []Grou
 	if s.weights.SearchEditing == nil {
 		return 0, nil
 	}
+	if s.invalid || s.orderError != nil {
+		return math.Inf(1), nil
+	}
 	s.generation++
 	for i, ch := range s.characters {
 		key, assigned := bindings[ch]
@@ -220,100 +267,188 @@ func (s *sequenceScorer) evaluate(bindings Layout, report bool) (float64, []Grou
 		}
 		s.characterKeys[i] = id
 	}
+	return s.evaluatePrepared(bindings, report)
+}
+
+func (s *sequenceScorer) evaluatePrepared(bindings Layout, report bool) (float64, []GroupPlan) {
+	layerCount := 1
+	if s.layered {
+		layerCount = 2
+	}
 	total := 0.0
 	var plans []GroupPlan
 	for _, group := range s.groups {
-		previous, next := s.previous, s.next
-		plan := GroupPlan{Name: group.group.Name, Priority: group.group.Priority}
-		var histories [][]sequenceChoice
-		segmentCost := 0.0
-		previousCount := 0
-		for i, stage := range group.stages {
-			if stage.reset && previousCount > 0 {
-				segmentCost += minimumCost(previous[:previousCount])
-			}
-			minPrevious, minIndex := math.Inf(1), -1
-			clearPrevious, clearIndex := math.Inf(1), -1
-			prefixOwners := []int(nil)
-			if !stage.reset {
-				for c := 0; c < previousCount; c++ {
-					if group.stages[i-1].candidates[c].length == 1 && previous[c] < clearPrevious {
-						clearPrevious, clearIndex = previous[c], c
-					}
-					if previous[c] < minPrevious {
-						minPrevious, minIndex = previous[c], c
-					}
-				}
-				for p := 0; p < stage.prefixCount; p++ {
-					s.prefixCosts[p] = math.Inf(1)
-				}
-				if report {
-					prefixOwners = make([]int, stage.prefixCount)
-				}
-				for c, candidate := range group.stages[i-1].candidates {
-					value := previous[c] + float64(candidate.length)*s.weights.SearchEditing.Backspace
-					for k, prefix := range candidate.prefixes {
-						// A transition may retain the full search or delete its last rune.
-						// Multiple Backspaces are excluded, regardless of their numeric cost.
-						if candidate.length-(k+1) > 1 {
-							continue
-						}
-						if value < s.prefixCosts[prefix] {
-							s.prefixCosts[prefix] = value
-							if report {
-								prefixOwners[prefix] = c
-							}
-						}
-					}
-				}
-			}
-			var choices []sequenceChoice
+		count := len(group.candidates)
+		if len(group.stages) == 0 {
 			if report {
-				choices = make([]sequenceChoice, len(stage.candidates))
+				plans = append(plans, GroupPlan{Name: group.group.Name, Priority: group.group.Priority})
 			}
-			for c, candidate := range stage.candidates {
-				fullCost := s.textCost(candidate.text, bindings)
-				value := fullCost
-				choice := sequenceChoice{previous: -1}
-				if !stage.reset {
-					value = minPrevious + s.weights.SearchEditing.ShiftHome + fullCost
-					choice.previous, choice.replace = minIndex, true
-					if clearCost := clearPrevious + s.weights.SearchEditing.Backspace + fullCost; clearCost < value {
-						value = clearCost
-						choice = sequenceChoice{previous: clearIndex}
+			continue
+		}
+		for i := range group.dp {
+			group.dp[i] = math.Inf(1)
+		}
+		var history []sequenceChoice
+		var prefixOwners []int
+		if report {
+			history = make([]sequenceChoice, len(group.dp))
+			prefixOwners = make([]int, layerCount*group.prefixCount)
+		}
+		for stage := range group.stages {
+			craft := &group.stages[stage]
+			craft.active = craft.active[:0]
+			for c := craft.start; c < craft.end; c++ {
+				if !math.IsInf(s.textCost(group.candidates[c].text, bindings), 1) {
+					craft.active = append(craft.active, c)
+				}
+			}
+		}
+		for c, candidate := range group.candidates {
+			if group.stages[candidate.stage].prerequisites != 0 {
+				continue
+			}
+			state := (1<<candidate.stage)*count + c
+			group.dp[state] = s.textCost(candidate.text, bindings) + candidate.penalty
+			if candidate.layer == 1 {
+				group.dp[state] += s.weights.LayerSwitchPenalty
+			}
+			if report {
+				history[state] = sequenceChoice{previous: -1}
+			}
+		}
+		fullMask := (1 << len(group.stages)) - 1
+		for mask := 1; mask < fullMask; mask++ {
+			minPrevious, clearPrevious := [2]float64{math.Inf(1), math.Inf(1)}, [2]float64{math.Inf(1), math.Inf(1)}
+			minIndex, clearIndex := [2]int{-1, -1}, [2]int{-1, -1}
+			for p := 0; p < layerCount*group.prefixCount; p++ {
+				s.prefixCosts[p] = math.Inf(1)
+			}
+			for stage, craft := range group.stages {
+				if mask&(1<<stage) == 0 {
+					continue
+				}
+				for _, c := range craft.active {
+					previous := group.dp[mask*count+c]
+					if math.IsInf(previous, 1) {
+						continue
 					}
-					// Require the entire resulting search to be typeable, including its
-					// retained prefix; missing characters are never allowed via reuse.
-					if !math.IsInf(fullCost, 1) {
-						for k, prefix := range candidate.incoming {
-							if prefix < 0 {
-								continue
-							}
-							overlapCost := s.prefixCosts[prefix] - float64(k+1)*s.weights.SearchEditing.Backspace + s.textCost(candidate.suffixes[k], bindings)
-							if overlapCost < value {
-								value = overlapCost
+					candidate := group.candidates[c]
+					for targetLayer := 0; targetLayer < layerCount; targetLayer++ {
+						adjusted := previous
+						if targetLayer != candidate.layer {
+							adjusted += s.weights.LayerSwitchPenalty
+						}
+						if adjusted < minPrevious[targetLayer] {
+							minPrevious[targetLayer], minIndex[targetLayer] = adjusted, c
+						}
+						if candidate.length == 1 && adjusted < clearPrevious[targetLayer] {
+							clearPrevious[targetLayer], clearIndex[targetLayer] = adjusted, c
+						}
+						value := adjusted + float64(candidate.length)*s.weights.SearchEditing.Backspace
+						for _, prefix := range candidate.outgoing {
+							index := targetLayer*group.prefixCount + prefix
+							if value < s.prefixCosts[index] {
+								s.prefixCosts[index] = value
 								if report {
-									choice = sequenceChoice{previous: prefixOwners[prefix], retained: k + 1}
+									prefixOwners[index] = c
 								}
 							}
 						}
 					}
 				}
-				next[c] = value
-				if report {
-					choices[c] = choice
+			}
+			if minIndex[0] < 0 {
+				continue
+			}
+			for stage, craft := range group.stages {
+				if mask&(1<<stage) != 0 {
+					continue
+				}
+				if mask&craft.prerequisites != craft.prerequisites {
+					continue
+				}
+				nextMask := mask | (1 << stage)
+				for _, c := range craft.active {
+					candidate := group.candidates[c]
+					fullCost := s.textCost(candidate.text, bindings)
+					if math.IsInf(fullCost, 1) {
+						continue
+					}
+					value := minPrevious[candidate.layer] + s.weights.SearchEditing.ShiftHome + fullCost
+					choice := sequenceChoice{previous: minIndex[candidate.layer], replace: true}
+					if clearCost := clearPrevious[candidate.layer] + s.weights.SearchEditing.Backspace + fullCost; clearCost < value {
+						value = clearCost
+						choice = sequenceChoice{previous: clearIndex[candidate.layer]}
+					}
+					for k, prefix := range candidate.incoming {
+						if prefix < 0 {
+							continue
+						}
+						prefix += candidate.layer * group.prefixCount
+						overlap := s.prefixCosts[prefix] - float64(k+1)*s.weights.SearchEditing.Backspace + s.textCost(candidate.suffixes[k], bindings)
+						if overlap < value {
+							value = overlap
+							if report {
+								choice = sequenceChoice{previous: prefixOwners[prefix], retained: k + 1}
+							}
+						}
+					}
+					value += candidate.penalty
+					state := nextMask*count + c
+					if value < group.dp[state] {
+						group.dp[state] = value
+						if report {
+							history[state] = choice
+						}
+					}
 				}
 			}
-			previous, next = next, previous
-			previousCount = len(stage.candidates)
-			if report {
-				histories = append(histories, choices)
+		}
+		best, bestIndex := math.Inf(1), -1
+		for c := 0; c < count; c++ {
+			if value := group.dp[fullMask*count+c]; value < best {
+				best, bestIndex = value, c
 			}
 		}
-		plan.Cost = segmentCost + minimumCost(previous[:previousCount])
-		total += group.group.Priority * plan.Cost
-		if report && !math.IsInf(plan.Cost, 1) {
-			plan.Steps = s.reconstruct(group, histories, bindings)
+		total += group.group.Priority * best
+		if report && bestIndex >= 0 {
+			plan := GroupPlan{Name: group.group.Name, Priority: group.group.Priority, Cost: best}
+			for mask, c := fullMask, bestIndex; mask > 0; {
+				candidate := group.candidates[c]
+				choice := history[mask*count+c]
+				step := CraftStep{Item: group.stages[candidate.stage].item, Search: candidate.search, Action: "type", Type: candidate.search, Cost: s.textCost(candidate.text, bindings) + candidate.penalty}
+				if s.layered {
+					step.Layer = layerName(candidate.layer)
+					step.LayerChange = candidate.layer == 1
+					if step.LayerChange {
+						step.Cost += s.weights.LayerSwitchPenalty
+					}
+				}
+				if choice.previous >= 0 {
+					from := group.candidates[choice.previous]
+					step.Cost = s.edgeCost(from, candidate, choice, bindings)
+					if s.layered {
+						step.LayerChange = from.layer != candidate.layer
+					}
+					if choice.replace {
+						step.Action = "shift-home"
+					} else {
+						step.Backspaces = from.length - choice.retained
+						step.Type = string([]rune(candidate.search)[choice.retained:])
+						if step.Backspaces > 0 {
+							step.Action = "backspace"
+						} else if step.Type == "" {
+							step.Action = "keep"
+						}
+					}
+				}
+				plan.Steps = append(plan.Steps, step)
+				mask ^= 1 << candidate.stage
+				c = choice.previous
+			}
+			for i, j := 0, len(plan.Steps)-1; i < j; i, j = i+1, j-1 {
+				plan.Steps[i], plan.Steps[j] = plan.Steps[j], plan.Steps[i]
+			}
 			plans = append(plans, plan)
 		}
 	}
@@ -326,89 +461,23 @@ type sequenceChoice struct {
 	replace  bool
 }
 
-func minimumCost(costs []float64) float64 {
-	if len(costs) == 0 {
-		return 0
-	}
-	best := math.Inf(1)
-	for _, cost := range costs {
-		best = math.Min(best, cost)
-	}
-	return best
-}
-
-// Reconstructing runs only for the final report, using the same costs as scoring.
-func (s *sequenceScorer) reconstruct(group sequenceGroup, histories [][]sequenceChoice, bindings Layout) []CraftStep {
-	steps := make([]CraftStep, len(group.stages))
-	// Recover each independent segment by evaluating it with history tracking.
-	for end := len(group.stages) - 1; end >= 0; {
-		start := end
-		for start > 0 && !group.stages[start].reset {
-			start--
-		}
-		costs := make([]float64, len(group.stages[end].candidates))
-		// Histories encode predecessor choices; replay their chosen edge costs.
-		stageCosts := make([][]float64, end-start+1)
-		for i := start; i <= end; i++ {
-			stageCosts[i-start] = make([]float64, len(group.stages[i].candidates))
-			for c, candidate := range group.stages[i].candidates {
-				choice := histories[i][c]
-				value := s.textCost(candidate.text, bindings)
-				if choice.previous >= 0 {
-					from := group.stages[i-1].candidates[choice.previous]
-					value = stageCosts[i-start-1][choice.previous] + s.edgeCost(from, candidate, choice, bindings)
-				}
-				stageCosts[i-start][c] = value
-			}
-		}
-		copy(costs, stageCosts[end-start])
-		best := 0
-		for c := range costs {
-			if costs[c] < costs[best] {
-				best = c
-			}
-		}
-		for i := end; i >= start; i-- {
-			candidate := group.stages[i].candidates[best]
-			choice := histories[i][best]
-			step := CraftStep{Item: group.stages[i].item, Search: candidate.search, Action: "type", Type: candidate.search, Cost: s.textCost(candidate.text, bindings)}
-			if choice.previous >= 0 {
-				from := group.stages[i-1].candidates[choice.previous]
-				step.Cost = s.edgeCost(from, candidate, choice, bindings)
-				if choice.replace {
-					step.Action = "shift-home"
-				} else {
-					step.Backspaces = from.length - choice.retained
-					step.Type = string([]rune(candidate.search)[choice.retained:])
-					step.Action = "backspace"
-					if step.Backspaces == 0 {
-						step.Action = "type"
-						if step.Type == "" {
-							step.Action = "keep"
-						}
-					}
-				}
-			}
-			steps[i], best = step, choice.previous
-		}
-		end = start - 1
-	}
-	return steps
-}
-
 func (s *sequenceScorer) edgeCost(from, to sequenceCandidate, choice sequenceChoice, bindings Layout) float64 {
+	cost := to.penalty
+	if from.layer != to.layer {
+		cost += s.weights.LayerSwitchPenalty
+	}
 	if choice.replace {
-		return s.weights.SearchEditing.ShiftHome + s.textCost(to.text, bindings)
+		return cost + s.weights.SearchEditing.ShiftHome + s.textCost(to.text, bindings)
 	}
 	typed := to.text
 	if choice.retained > 0 {
 		typed = to.suffixes[choice.retained-1]
 	}
-	return float64(from.length-choice.retained)*s.weights.SearchEditing.Backspace + s.textCost(typed, bindings)
+	return cost + float64(from.length-choice.retained)*s.weights.SearchEditing.Backspace + s.textCost(typed, bindings)
 }
 
-// PlanGroups finds the cheapest editing sequence for each active ordered group.
-// Every segment starts with an empty search. Missing/ignored crafts break chains.
+// PlanGroups jointly chooses craft order, searches and single-Backspace edits.
+// Missing and ignored crafts are omitted; every included craft is visited once.
 func PlanGroups(bindings Layout, goals []Goal, weights Weights) ([]GroupPlan, error) {
 	goals, err := WithPreferredSearches(goals, nil)
 	if err != nil {
@@ -422,6 +491,12 @@ func PlanGroups(bindings Layout, goals []Goal, weights Weights) ([]GroupPlan, er
 		}
 	}
 	scorer := newSequenceScorer(goals, weights)
+	if scorer.orderError != nil {
+		return nil, scorer.orderError
+	}
+	if scorer.invalid {
+		return nil, fmt.Errorf("groups support at most %d active unique crafts", maxGroupCrafts)
+	}
 	cost, plans := scorer.evaluate(bindings, true)
 	if math.IsInf(cost, 1) {
 		return nil, fmt.Errorf("group has no typeable search sequence")

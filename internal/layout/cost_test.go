@@ -85,27 +85,27 @@ func TestCostReconsidersCandidatesAfterSwap(t *testing.T) {
 	}
 }
 
-func TestCraftGroupPriorityAndOrder(t *testing.T) {
+func TestCraftGroupPriorityAndOrderIndependence(t *testing.T) {
 	bindings := Layout{'a': "A", 'b': "B", 'c': "C"}
 	weights := Weights{Keys: map[string]KeyWeight{
 		"A": {Effort: 1, X: 0}, "B": {Effort: 1, X: 1}, "C": {Effort: 1, X: 4},
 	}, Groups: []CraftGroup{{Name: "sequence", Priority: 2, Crafts: []string{"one", "two", "three"}}}}
 	goals := []Goal{{Item: "one", Substrings: []string{"a"}}, {Item: "two", Substrings: []string{"b"}}, {Item: "three", Substrings: []string{"c"}}}
-	if got := Cost(bindings, goals, weights); got != 11 {
-		t.Fatalf("cost = %v, want 3 + 2*(1+3)", got)
+	if got := Cost(bindings, goals, weights); math.Abs(got-41.0/3) > 1e-9 {
+		t.Fatalf("cost = %v, want 3 + 2*(2/3)*(1+4+3)", got)
 	}
 	weights.Groups[0].Crafts = []string{"two", "one", "three"}
-	if got := Cost(bindings, goals, weights); got != 13 {
-		t.Fatalf("reordered cost = %v, want 13", got)
+	if got := Cost(bindings, goals, weights); math.Abs(got-41.0/3) > 1e-9 {
+		t.Fatalf("reordering must preserve cost: %v", got)
 	}
 	weights.Crafts = map[string]float64{"one": 0}
-	if got := Cost(bindings, goals, weights); got != 2 {
-		t.Fatalf("ignored craft must skip both incident edges: %v", got)
+	if got := Cost(bindings, goals, weights); got != 8 {
+		t.Fatalf("ignored craft must be omitted from the group: %v", got)
 	}
 	weights.Crafts = nil
 	weights.Groups[0].Crafts = []string{"one", "absent", "three"}
-	if got := Cost(bindings, goals, weights); got != 3 {
-		t.Fatalf("absent craft must not bridge neighbours: %v", got)
+	if got := Cost(bindings, goals, weights); got != 11 {
+		t.Fatalf("absent craft must be omitted from the group: %v", got)
 	}
 	weights.Groups[0].Priority = 0
 	if got := Cost(bindings, goals, weights); got != 3 {
