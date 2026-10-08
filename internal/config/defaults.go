@@ -1,6 +1,15 @@
+// Package config defines config for the louxy layout
 package config
 
+// AllowGoodJunk allows searches that also show other goal crafts.
+// Unavoidable junk is accepted in either mode.
+const AllowGoodJunk = false
+
 const Language = "no_no"
+
+// const Language = "en_gb"
+
+// const Language = "ovd"
 
 var Inventory = []string{
 	"block.minecraft.gravel",
