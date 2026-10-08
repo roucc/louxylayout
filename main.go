@@ -102,8 +102,9 @@ func main() {
 	}
 	fmt.Printf("Optimized characters: %d\n", len(bindings))
 	fmt.Println("Cost:", optimized.Cost)
-	fmt.Println("Cheapest searches:")
+	fmt.Println("Selected searches:")
 	for _, goal := range optimized.Searches {
 		fmt.Printf("  %s: %q\n", goal.Item, goal.Substrings)
 	}
+
 }

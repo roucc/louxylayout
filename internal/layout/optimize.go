@@ -19,7 +19,7 @@ type OptimizeOptions struct {
 type Optimized struct {
 	Bindings Layout
 	Cost     float64
-	Searches []Goal // one cheapest substring per craft
+	Searches []Goal // one selected substring per craft, cheapest typing choices
 }
 
 // Optimize explores character sets and assignments using simulated annealing.
@@ -45,6 +45,9 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 		fixedKeys[key] = true
 	}
 	for key, weight := range weights.Keys {
+		if math.IsNaN(weight.X) || math.IsNaN(weight.Y) || math.IsInf(weight.X, 0) || math.IsInf(weight.Y, 0) {
+			return Optimized{}, fmt.Errorf("key position for %q must be finite", key)
+		}
 		if weight.Effort < 0 || math.IsNaN(weight.Effort) || math.IsInf(weight.Effort, 0) {
 			return Optimized{}, fmt.Errorf("invalid effort for %q", key)
 		}
@@ -53,8 +56,10 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 		}
 	}
 	sort.Strings(keys)
-	if weights.SameFingerPenalty < 0 || weights.DefaultTransitionPenalty < 0 || math.IsNaN(weights.SameFingerPenalty) || math.IsNaN(weights.DefaultTransitionPenalty) || math.IsInf(weights.SameFingerPenalty, 0) || math.IsInf(weights.DefaultTransitionPenalty, 0) {
-		return Optimized{}, fmt.Errorf("penalties must be finite and nonnegative")
+	for _, penalty := range []float64{weights.SameFingerPenalty, weights.DefaultTransitionPenalty, weights.DistancePenalty, weights.FingerReusePenalty} {
+		if penalty < 0 || math.IsNaN(penalty) || math.IsInf(penalty, 0) {
+			return Optimized{}, fmt.Errorf("penalties must be finite and nonnegative")
+		}
 	}
 	for _, penalty := range weights.Transitions {
 		if penalty < 0 || math.IsNaN(penalty) || math.IsInf(penalty, 0) {
@@ -67,8 +72,38 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 		}
 	}
 
-	// A contiguous longer search cannot be cheaper with nonnegative costs.
-	// This pruning preserves typing choices, unlike pruning character supersets.
+	for _, group := range weights.Groups {
+		if group.Priority < 0 || math.IsNaN(group.Priority) || math.IsInf(group.Priority, 0) {
+			return Optimized{}, fmt.Errorf("group %q priority must be finite and nonnegative", group.Name)
+		}
+	}
+	// Precompute transition distances once. Explicit overrides still receive
+	// the distance charge; the caller's weight maps are never modified.
+	if weights.DistancePenalty > 0 {
+		transitions := make(map[Transition]float64, len(weights.Keys)*len(weights.Keys))
+		for from, a := range weights.Keys {
+			for to, b := range weights.Keys {
+				pair := Transition{From: from, To: to}
+				penalty, ok := weights.Transitions[pair]
+				if !ok {
+					penalty = weights.DefaultTransitionPenalty
+					if a.Finger != "" && a.Finger == b.Finger {
+						penalty += weights.SameFingerPenalty
+					}
+				}
+				transitions[pair] = penalty + weights.DistancePenalty*math.Hypot(a.X-b.X, a.Y-b.Y)
+			}
+		}
+		weights.Transitions = transitions
+		weights.DistancePenalty = 0
+	}
+	// With positive efforts, a longer search containing another candidate is
+	// strictly more expensive among the allowed searches.
+	// For zero-effort keys, only prune when the shorter search wins any cost tie.
+	positiveEfforts := true
+	for _, key := range weights.Keys {
+		positiveEfforts = positiveEfforts && key.Effort > 0
+	}
 	prepared := make([]Goal, 0, len(goals))
 	alphabet := ""
 	for _, goal := range goals {
@@ -84,7 +119,8 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 			}
 			lower, redundant := strings.ToLower(sub), false
 			for _, kept := range filtered.Substrings {
-				if strings.Contains(lower, strings.ToLower(kept)) {
+				if strings.Contains(lower, strings.ToLower(kept)) &&
+					(kept <= sub || positiveEfforts && len([]rune(lower)) > len([]rune(strings.ToLower(kept)))) {
 					redundant = true
 					break
 				}
@@ -130,7 +166,7 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 	for i, ch := range initial {
 		base[ch] = keys[i]
 	}
-	if math.IsInf(Cost(base, prepared, weights), 1) {
+	if cost, _ := score(base, prepared, weights, math.Inf(1)); math.IsInf(cost, 1) {
 		return Optimized{}, fmt.Errorf("starting character set cannot type every goal")
 	}
 	best := Optimized{Cost: math.Inf(1)}
@@ -155,26 +191,22 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 			maxLength = max(maxLength, len([]rune(sub)))
 		}
 	}
-	missingPenalty := 1 + importanceSum*float64(maxLength)*(maxEffort+maxTransition)
-	evaluate := func(bindings Layout) (float64, bool) {
-		total, feasible := 0.0, true
-		for _, goal := range prepared {
-			cheapest := math.Inf(1)
-			for _, sub := range goal.Substrings {
-				cheapest = math.Min(cheapest, StringCost(sub, bindings, weights))
-			}
-			importance, ok := weights.Crafts[goal.Item]
-			if !ok {
-				importance = 1
-			}
-			if math.IsInf(cheapest, 1) {
-				total += missingPenalty
-				feasible = false
-			} else {
-				total += importance * cheapest
-			}
+	missingPenalty := 1 + importanceSum*(float64(maxLength)*(maxEffort+maxTransition)+
+		weights.FingerReusePenalty*float64(maxLength)*float64(max(0, maxLength-1))/2)
+	// Bound group costs too, so losing a goal is never rewarded by dropping
+	// its proximity edges during exploration.
+	maxDistance := 0.0
+	for _, a := range weights.Keys {
+		for _, b := range weights.Keys {
+			maxDistance = math.Max(maxDistance, math.Hypot(a.X-b.X, a.Y-b.Y))
 		}
-		return total, feasible
+	}
+	for _, group := range weights.Groups {
+		missingPenalty += group.Priority * float64(max(0, len(group.Crafts)-1)) * maxDistance
+
+	}
+	evaluate := func(bindings Layout) (float64, bool) {
+		return score(bindings, prepared, weights, missingPenalty)
 	}
 	for restart := 0; restart < options.Restarts; restart++ {
 		bindings := make(Layout)
@@ -207,9 +239,9 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 				}
 			}
 		}
-		current, _ := evaluate(bindings)
+		current, currentFeasible := evaluate(bindings)
 		for iteration := 0; iteration <= options.Iterations; iteration++ {
-			cost, feasible := evaluate(bindings)
+			cost, feasible := current, currentFeasible
 			if feasible && (cost < best.Cost || cost == best.Cost && len(bindings) < len(best.Bindings)) {
 				best.Cost, best.Bindings = cost, make(Layout)
 				for ch, key := range bindings {
@@ -254,10 +286,10 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 					next[ch] = first
 				}
 			}
-			nextCost, _ := evaluate(next)
+			nextCost, nextFeasible := evaluate(next)
 			temperature := 2 * (1 - float64(iteration)/float64(options.Iterations))
 			if nextCost <= current || temperature > 0 && rng.Float64() < math.Exp((current-nextCost)/temperature) {
-				bindings, current = next, nextCost
+				bindings, current, currentFeasible = next, nextCost, nextFeasible
 			}
 		}
 	}
@@ -267,12 +299,9 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 	}
 	for _, goal := range goals {
 		choice := Goal{Item: goal.Item}
-		cost := math.Inf(1)
-		for _, sub := range goal.Substrings {
-			if value := StringCost(sub, best.Bindings, weights); value < cost {
-				cost = value
-				choice.Substrings = []string{sub}
-			}
+		sub, cost := cheapestSearch(goal, best.Bindings, weights)
+		if !math.IsInf(cost, 1) {
+			choice.Substrings = []string{sub}
 		}
 		best.Searches = append(best.Searches, choice)
 		for _, sub := range choice.Substrings {
@@ -281,7 +310,7 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 			}
 		}
 	}
-	// Drop characters unused by the chosen cheapest searches; this preserves cost.
+	// Drop characters unused by the chosen searches; this preserves cost.
 	for ch := range best.Bindings {
 		if !used[ch] {
 			delete(best.Bindings, ch)
