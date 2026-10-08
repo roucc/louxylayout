@@ -33,6 +33,9 @@ var KeyboardWeights = Weights{
 	},
 	// Higher group priority pulls consecutive crafts' search keys closer together.
 	// Add sequences here using the same item IDs as Crafts above.
+	// Existing controls: Shift+Home on MB4 and Backspace on MB5.
+	// Costs are ergonomic estimates; these controls are not rebound by Optimize.
+	SearchEditing: &SearchEditCosts{ShiftHome: 1, Backspace: 0.5},
 	Groups: []CraftGroup{
 		{
 			Name:     "fortress",

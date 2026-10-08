@@ -18,9 +18,10 @@ type OptimizeOptions struct {
 }
 
 type Optimized struct {
-	Bindings Layout
-	Cost     float64
-	Searches []Goal // one selected substring per craft, including search preferences
+	Bindings   Layout
+	Cost       float64
+	Searches   []Goal      // one selected substring per craft, including search preferences
+	GroupPlans []GroupPlan // contextual searches and editing actions for each group
 }
 
 // Optimize explores character sets and assignments using simulated annealing.
@@ -68,6 +69,13 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 	for _, penalty := range []float64{weights.SameFingerPenalty, weights.DefaultTransitionPenalty, weights.DistancePenalty, weights.FingerReusePenalty} {
 		if penalty < 0 || math.IsNaN(penalty) || math.IsInf(penalty, 0) {
 			return Optimized{}, fmt.Errorf("penalties must be finite and nonnegative")
+		}
+	}
+	if weights.SearchEditing != nil {
+		for _, cost := range []float64{weights.SearchEditing.ShiftHome, weights.SearchEditing.Backspace} {
+			if cost < 0 || math.IsNaN(cost) || math.IsInf(cost, 0) {
+				return Optimized{}, fmt.Errorf("search edit costs must be finite and nonnegative")
+			}
 		}
 	}
 	for _, penalty := range weights.Transitions {
@@ -147,10 +155,16 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 		}
 		prepared = append(prepared, filtered)
 	}
-	for ch := range initialBindings {
-		alphabet += string(ch)
+	sequence := newSequenceScorer(goals, weights)
+	var fullAlphabet strings.Builder
+	fullAlphabet.WriteString(alphabet)
+	for _, text := range sequence.texts {
+		fullAlphabet.WriteString(text)
 	}
-	chars := []rune(characterKey(alphabet))
+	for ch := range initialBindings {
+		fullAlphabet.WriteRune(ch)
+	}
+	chars := []rune(characterKey(fullAlphabet.String()))
 	var movable []rune
 	for _, ch := range chars {
 		if _, fixed := options.Fixed[ch]; !fixed {
@@ -221,10 +235,18 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 	}
 	for _, group := range weights.Groups {
 		missingPenalty += group.Priority * float64(max(0, len(group.Crafts)-1)) * maxDistance
-
+		if weights.SearchEditing != nil {
+			missingPenalty += group.Priority * float64(len(group.Crafts)) * (float64(maxLength)*(maxEffort+maxTransition) + weights.FingerReusePenalty*float64(maxLength)*float64(max(0, maxLength-1))/2 + weights.SearchEditing.ShiftHome)
+		}
 	}
 	evaluate := func(bindings Layout) (float64, bool) {
-		return score(bindings, prepared, weights, missingPenalty)
+		total, feasible := score(bindings, prepared, weights, missingPenalty)
+		editing, _ := sequence.evaluate(bindings, false)
+		if math.IsInf(editing, 1) {
+			editing = missingPenalty
+			feasible = false
+		}
+		return total + editing, feasible
 	}
 	for restart := 0; restart < options.Restarts; restart++ {
 		preferred := Layout(nil)
@@ -308,6 +330,7 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 			}
 		}
 	}
+	_, best.GroupPlans = sequence.evaluate(best.Bindings, true)
 	used := make(map[rune]bool)
 	for ch := range options.Fixed {
 		used[ch] = true
@@ -325,7 +348,14 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 			}
 		}
 	}
-	// Drop characters unused by the chosen searches; this preserves cost.
+	for _, plan := range best.GroupPlans {
+		for _, step := range plan.Steps {
+			for _, ch := range strings.ToLower(step.Search) {
+				used[ch] = true
+			}
+		}
+	}
+	// Drop characters unused by standalone searches and group plans.
 	for ch := range best.Bindings {
 		if !used[ch] {
 			delete(best.Bindings, ch)

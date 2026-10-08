@@ -47,8 +47,9 @@ type Weights struct {
 	Transitions map[Transition]float64
 	// Crafts weights goal importance by item ID. Unlisted goals have weight 1;
 	// a weight of zero excludes a goal from the total.
-	Crafts map[string]float64
-	Groups []CraftGroup
+	Crafts        map[string]float64
+	SearchEditing *SearchEditCosts // nil disables ordered search-edit planning
+	Groups        []CraftGroup
 }
 
 // StringCost sums physical key efforts and consecutive-key transition costs.
@@ -170,5 +171,6 @@ func score(bindings Layout, goals []Goal, weights Weights, missingPenalty float6
 // All candidates are reconsidered on every call, including after swaps.
 func Cost(bindings Layout, goals []Goal, weights Weights) float64 {
 	total, _ := score(bindings, goals, weights, math.Inf(1))
-	return total
+	editing, _ := newSequenceScorer(goals, weights).evaluate(bindings, false)
+	return total + editing
 }

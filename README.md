@@ -140,3 +140,50 @@ removed during optimization; they seed the search without adding a scoring
 penalty. Use `OptimizeOptions.Fixed` for bindings that must stay in place.
 Duplicate typed characters, unknown physical keys and conflicts with fixed bindings produce
 configuration errors. Leave the map empty for the usual random starts.
+
+## Backspace overlap between crafts
+
+Ordered groups can select searches together, so the next craft can reuse a
+prefix of the previous search. Configure the costs of your existing controls in
+`KeyboardWeights`:
+
+```go
+SearchEditing: &SearchEditCosts{
+    ShiftHome: 1,
+    Backspace: 0.5,
+},
+```
+
+These are action costs, not new bindings. Home on MB4 and Backspace on MB5 stay
+outside the layout assignments. `ShiftHome` includes selecting the entire old
+search before typing its replacement. `Backspace` is the cost of deleting one character. Each transition permits at
+most one Backspace; two or more deletions require Shift+Home. Set `SearchEditing` to `nil` to disable overlap planning.
+
+For a transition from `l ` to `lha`, the planner compares:
+
+- `SH lha`: select the whole search and type all three characters.
+- `BS ha`: delete the trailing space, keep `l`, and type only `ha`.
+
+It chooses searches across the complete group rather than greedily choosing each
+craft. It can use a longer valid search when its prefix helps the following
+craft, append without deleting, delete without typing, or keep an identical
+search. A deletion removes one Unicode character, so `ø` takes one Backspace. Each
+segment starts with an empty search and the cursor at the end; missing or ignored
+crafts break the chain. Typing costs apply only to newly typed text, with finger
+reuse counted within that new text. Mouse actions are charged their configured
+costs, without keyboard travel or cross-action finger penalties.
+
+Scoring keeps standalone craft typing costs and the existing proximity penalty,
+then adds each group's `Priority` times its cheapest editing sequence cost.
+This lets the layout support both individual crafts and repeated sequences.
+The optimizer uses every allowed group candidate, while retaining pruning for
+standalone searches. Shared-prefix indexes and typing costs are precomputed or
+cached to avoid comparing every candidate pair at each iteration.
+
+The report prints standalone searches separately from each group's chosen
+searches and actions, including physical keys for newly typed text. A craft can
+use a different search in different groups. `PreferredSearches` restrictions
+apply to every plan. Search validity still follows the configured inventory,
+grid and junk policy; planning does not simulate inventory changes from actually
+performing the crafts. With `AllowGoodJunk = false`, a shortcut rejected by the
+candidate generator cannot be used even if its prefix overlaps.

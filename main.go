@@ -111,5 +111,27 @@ func main() {
 	for _, goal := range optimized.Searches {
 		fmt.Printf("  %s: %q\n", goal.Item, goal.Substrings)
 	}
+	if len(optimized.GroupPlans) > 0 {
+		fmt.Println("Group sequences (SH = Shift+Home, BS = Backspace):")
+		for _, plan := range optimized.GroupPlans {
+			fmt.Printf("  %s (priority %g, edit cost %.2f):\n", plan.Name, plan.Priority, plan.Cost)
+			for _, step := range plan.Steps {
+				operation := ""
+				switch step.Action {
+				case "shift-home":
+					operation = "SH "
+				case "backspace":
+					operation = fmt.Sprintf("BS×%d ", step.Backspaces)
+				case "keep":
+					operation = "keep "
+				}
+				keys := make([]string, 0, len([]rune(step.Type)))
+				for _, ch := range step.Type {
+					keys = append(keys, bindings[ch])
+				}
+				fmt.Printf("    %s: %s%q → %q (type on %v)\n", step.Item, operation, step.Type, step.Search, keys)
+			}
+		}
+	}
 
 }
