@@ -10,8 +10,9 @@ import (
 )
 
 type Goal struct {
-	Item       string
-	Substrings []string
+	Item                string
+	Substrings          []string
+	PreferredSubstrings []string // optional allowed searches; empty means all candidates
 }
 
 type CharacterSet struct {
@@ -30,6 +31,10 @@ func MinimumCharacters(goals []Goal) (CharacterSet, error) {
 // MinimumCharactersWithContext performs the same exact search, with cancellation
 // for expensive inputs. No partial result is returned on cancellation.
 func MinimumCharactersWithContext(ctx context.Context, goals []Goal) (CharacterSet, error) {
+	goals, err := WithPreferredSearches(goals, nil)
+	if err != nil {
+		return CharacterSet{}, err
+	}
 	candidates := make([][]string, len(goals))
 	for i, goal := range goals {
 		sets := make(map[string]bool)

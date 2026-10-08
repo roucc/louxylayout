@@ -104,3 +104,39 @@ so a priority-5 craft pays five times each comfort penalty. Raise `DistancePenal
 to prefer nearby keys, or `FingerReusePenalty` to prefer different fingers; zero
 disables either. Priorities remain soft preferences across the whole layout.
 Physical key distances are precomputed once during optimization for speed.
+
+## Optional user preferences
+
+Set `PreferredSearches` in `internal/config/defaults.go` to restrict a goal to
+one or more valid searches. An empty map or empty list allows all valid searches:
+
+```go
+var PreferredSearches = map[string][]string{
+    "block.minecraft.white_bed": {"l ", "n "}, // Norwegian
+}
+```
+
+The optimizer uses only the listed searches for that goal and chooses the
+cheapest typeable one. They must be valid candidates for the selected language,
+inventory and `AllowGoodJunk` setting. Invalid searches and unknown goal IDs
+produce a configuration error; spaces are significant and case is ignored.
+Restrictions apply to minimum-character selection, optimization and reporting.
+If none of the allowed searches can be typed, that goal is unreachable.
+
+Set `PreferredBindings` in `internal/layout/keyboard.go` to start the first
+optimizer restart with familiar key positions:
+
+```go
+var PreferredBindings = map[string]rune{
+    "A": 'N',                       // A types N
+    "Q": 'L', "W": 'H', "E": 'A', // QWE types LHA
+}
+```
+
+This maps physical keys to their rebound typed characters. Uppercase and lowercase characters
+are accepted. The remaining starting characters are placed randomly on unused
+keys, and later restarts explore random layouts. These bindings can move or be
+removed during optimization; they seed the search without adding a scoring
+penalty. Use `OptimizeOptions.Fixed` for bindings that must stay in place.
+Duplicate typed characters, unknown physical keys and conflicts with fixed bindings produce
+configuration errors. Leave the map empty for the usual random starts.

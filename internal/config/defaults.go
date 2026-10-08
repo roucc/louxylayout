@@ -77,3 +77,9 @@ var Goals = []string{
 	"item.minecraft.stone_shovel",
 	"item.minecraft.oak_boat",
 }
+
+// PreferredSearches optionally restricts valid searches for each goal in the
+// selected language. Leave empty to choose freely. Spaces are significant.
+var PreferredSearches = map[string][]string{
+	// "block.minecraft.white_bed": {"l ", "n "}, // Norwegian example
+}

@@ -12,20 +12,25 @@ type OptimizeOptions struct {
 	Restarts          int
 	Iterations        int // attempted changes per restart
 	Seed              int64
-	Fixed             Layout // characters that must stay on their supplied keys
-	InitialCharacters []rune // a feasible starting character set
+	Fixed             Layout          // characters that must stay on their supplied keys
+	InitialCharacters []rune          // a feasible starting character set
+	InitialBindings   map[string]rune // physical key -> typed character; first restart only, movable
 }
 
 type Optimized struct {
 	Bindings Layout
 	Cost     float64
-	Searches []Goal // one selected substring per craft, cheapest typing choices
+	Searches []Goal // one selected substring per craft, including search preferences
 }
 
 // Optimize explores character sets and assignments using simulated annealing.
 // It keeps every goal and uses all candidates. Results are heuristic, not a
 // guarantee of the global minimum. Equal-cost results prefer fewer characters.
 func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized, error) {
+	goals, err := WithPreferredSearches(goals, nil)
+	if err != nil {
+		return Optimized{}, err
+	}
 	if options.Restarts <= 0 {
 		options.Restarts = 8
 	}
@@ -56,6 +61,10 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 		}
 	}
 	sort.Strings(keys)
+	initialBindings, err := normalizeInitialBindings(options.InitialBindings, options.Fixed, weights)
+	if err != nil {
+		return Optimized{}, err
+	}
 	for _, penalty := range []float64{weights.SameFingerPenalty, weights.DefaultTransitionPenalty, weights.DistancePenalty, weights.FingerReusePenalty} {
 		if penalty < 0 || math.IsNaN(penalty) || math.IsInf(penalty, 0) {
 			return Optimized{}, fmt.Errorf("penalties must be finite and nonnegative")
@@ -110,9 +119,12 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 		if importance, ok := weights.Crafts[goal.Item]; ok && importance == 0 {
 			continue
 		}
+		if err := validatePreferredSearches(goal); err != nil {
+			return Optimized{}, err
+		}
 		subs := append([]string(nil), goal.Substrings...)
 		sort.SliceStable(subs, func(i, j int) bool { return len([]rune(subs[i])) < len([]rune(subs[j])) })
-		filtered := Goal{Item: goal.Item}
+		filtered := Goal{Item: goal.Item} // goals have already been restricted
 		for _, sub := range subs {
 			if sub == "" {
 				continue
@@ -135,6 +147,9 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 		}
 		prepared = append(prepared, filtered)
 	}
+	for ch := range initialBindings {
+		alphabet += string(ch)
+	}
 	chars := []rune(characterKey(alphabet))
 	var movable []rune
 	for _, ch := range chars {
@@ -149,6 +164,9 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 			return Optimized{}, err
 		}
 		seed = minimum.Characters
+	}
+	for ch := range initialBindings {
+		seed = append(append([]rune(nil), seed...), ch)
 	}
 	var initial []rune
 	for _, ch := range []rune(characterKey(string(seed))) {
@@ -209,14 +227,11 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 		return score(bindings, prepared, weights, missingPenalty)
 	}
 	for restart := 0; restart < options.Restarts; restart++ {
-		bindings := make(Layout)
-		for ch, key := range options.Fixed {
-			bindings[ch] = key
+		preferred := Layout(nil)
+		if restart == 0 {
+			preferred = initialBindings
 		}
-		permutation := rng.Perm(len(keys))
-		for i, ch := range initial {
-			bindings[ch] = keys[permutation[i]]
-		}
+		bindings := startingLayout(initial, keys, options.Fixed, preferred, rng)
 		// Some starts fill spare keys with other characters to explore larger sets.
 		if restart%2 == 1 {
 			for _, index := range rng.Perm(len(movable)) {

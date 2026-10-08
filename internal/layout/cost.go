@@ -102,6 +102,9 @@ func StringCost(substring string, bindings Layout, weights Weights) float64 {
 func cheapestSearch(goal Goal, bindings Layout, weights Weights) (string, float64) {
 	choice, best := "", math.Inf(1)
 	for _, sub := range goal.Substrings {
+		if len(goal.PreferredSubstrings) > 0 && !preferredSearch(goal, sub) {
+			continue
+		}
 		value := StringCost(sub, bindings, weights)
 		if value < best || value == best && sub < choice {
 			choice, best = sub, value

@@ -61,6 +61,10 @@ func main() {
 		}
 		goals = append(goals, goal)
 	}
+	goals, err = layout.WithPreferredSearches(goals, config.PreferredSearches)
+	if err != nil {
+		log.Fatal(err)
+	}
 	result, err := layout.MinimumCharacters(goals)
 	if err != nil {
 		log.Fatal(err)
@@ -78,6 +82,7 @@ func main() {
 		Seed:              42,
 		Fixed:             layout.Layout{' ': "Space"},
 		InitialCharacters: result.Characters,
+		InitialBindings:   layout.PreferredBindings,
 	})
 	if err != nil {
 		log.Fatal(err)

@@ -146,3 +146,11 @@ var KeyboardWeights = Weights{
 		{From: "R", To: "E"}: 0.4,
 	},
 }
+
+// PreferredBindings seeds the first optimizer restart; these keys can move.
+// Maps physical key -> typed character (uppercase or lowercase).
+// Leave empty for random starts.
+var PreferredBindings = map[string]rune{
+	// "A": 'N',
+	// "Q": 'L', "W": 'H', "E": 'A',
+}
