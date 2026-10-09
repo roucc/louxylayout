@@ -71,8 +71,8 @@ and inventory as Roux, and the supplied ESDF key efforts and finger assignments.
 Space retains its existing cost. Coordinates follow physical QWERTY rows.
 Transition overrides were shifted one key right within each row; missing
 horizontal-neighbour costs use the nearest transferred directional cost, with
-same-finger penalties for unmeasured same-finger pairs. Other transitions use the fallback costs and physical-distance penalty, without
-additional cross-row overrides.
+same-finger penalties for unmeasured same-finger pairs. Other transitions use the fallback costs and physical-distance penalty, with
+the additional left-side row-change overrides described below.
 
 `_` in the supplied searches was converted to a literal space. Searches for items
 outside the current goals were omitted. Unspecified groups, priorities, layer
@@ -152,6 +152,25 @@ The profile's `weights` also contains:
 Distance and finger-reuse penalties still apply to explicit transition overrides.
 An empty finger assignment skips finger penalties. Zero disables an extra
 penalty. Physical key costs and transition tables are shared by both layers.
+
+### Left-side row changes
+
+All bundled profiles give staggered cross-row moves on the ring/middle side of
+the keyboard stronger explicit transition costs. This includes A ↔ Q. Roux
+profiles cover the left cluster through W/S/X, while Lily profiles extend the
+region one column right through E/D/C for ESDF. Space and horizontal row rolls
+are excluded. Same-finger charges are preserved in the new overrides.
+
+These transition costs are at least `default_transition_penalty + 0.5`, plus the
+same-finger penalty when applicable. A → Q costs 1.0 in Roux profiles and 2.0 in
+Lily profiles (A and Q both use Lily's ring finger). Key efforts, distance costs,
+and finger-reuse penalties still apply. A priority-5 craft therefore pays 2.5
+additional weighted cost units for an A → Q move compared with the old weights.
+
+These are soft penalties, so the optimizer can trade them against the rest of
+the layout. They use the existing transition lookup and shared physical-key
+tables on both layers, adding no optimizer states or iterations. Edit individual
+entries under `weights.transitions` to tune particular moves.
 
 ## Craft groups and required order
 
