@@ -1,58 +1,141 @@
-package layout
+package layout_test
 
 import (
-	"louxylayout/internal/config"
-	"louxylayout/internal/data"
-	"louxylayout/internal/search"
+	"math"
 	"testing"
+
+	"louxylayout/internal/data"
+	"louxylayout/internal/layout"
+	"louxylayout/internal/profile"
+	"louxylayout/internal/search"
+	"louxylayout/profiles"
 )
 
-func BenchmarkOptimizeCraftGroups(b *testing.B) {
-	groups, items, err := data.Load(config.Language)
+// Integration checks and benchmarks use the bundled default profile, so no
+// personal settings are copied into Go test code.
+func profileFixture(tb testing.TB) ([]layout.Goal, layout.Weights, layout.OptimizeOptions) {
+	tb.Helper()
+	encoded, err := profiles.Files.ReadFile(profiles.Default + ".json")
 	if err != nil {
-		b.Fatal(err)
+		tb.Fatal(err)
 	}
-	finder := search.New(groups, items, config.Inventory, config.Goals)
-	var goals []Goal
-	for _, item := range config.Goals {
-		goal := Goal{Item: item}
-		candidates := finder.JunklessSubstrings(item)
-		if config.AllowGoodJunk {
-			candidates = finder.ShortestUniqueSubstringWithJunk(item)
+	personal, err := profile.Parse(encoded)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	weights, options, err := personal.Settings()
+	if err != nil {
+		tb.Fatal(err)
+	}
+	groups, items, err := data.Load(personal.Language)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	finder := search.New(groups, items, personal.Inventory, personal.Goals)
+	goals, err := personal.BuildGoals(finder)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	minimum, err := layout.MinimumCharacters(goals)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	options.InitialCharacters = minimum.Characters
+	return goals, weights, options
+}
+
+func BenchmarkOptimizeCraftGroups(b *testing.B) { benchmarkOptimizer(b, false, true) }
+func BenchmarkOptimizeShiftLayers(b *testing.B) { benchmarkOptimizer(b, true, true) }
+func BenchmarkCraftOrderConstraints(b *testing.B) {
+	b.Run("Free", func(b *testing.B) { benchmarkOptimizer(b, true, false) })
+	b.Run("IngotsBeforeTools", func(b *testing.B) { benchmarkOptimizer(b, true, true) })
+}
+
+func benchmarkOptimizer(b *testing.B, shift, constrained bool) {
+	goals, weights, options := profileFixture(b)
+	options.Restarts, options.Iterations, options.EnableShiftLayer = 1, 200, shift
+	if !constrained {
+		for i := range weights.Groups {
+			weights.Groups[i].Before = nil
 		}
-		for _, candidate := range candidates {
-			goal.Substrings = append(goal.Substrings, candidate.Sub)
-		}
-		goals = append(goals, goal)
 	}
-	goals, err = WithPreferredSearches(goals, config.PreferredSearches)
-	if err != nil {
-		b.Fatal(err)
-	}
-	minimum, err := MinimumCharacters(goals)
-	if err != nil {
-		b.Fatal(err)
-	}
-	options := OptimizeOptions{Seed: 42, Fixed: Layout{' ': "Space"}, InitialCharacters: minimum.Characters, Restarts: 1, Iterations: 200, InitialBindings: PreferredBindings}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := Optimize(goals, KeyboardWeights, options); err != nil {
+		if _, err := layout.Optimize(goals, weights, options); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func TestNorwegianBedPreferencesAreValid(t *testing.T) {
-	groups, items, err := data.Load("no_no")
+func TestProfileLayeredOptimizerCostAndPlans(t *testing.T) {
+	goals, weights, options := profileFixture(t)
+	options.Restarts, options.Iterations, options.EnableShiftLayer = 1, 30, true
+	got, err := layout.Optimize(goals, weights, options)
 	if err != nil {
 		t.Fatal(err)
 	}
-	finder := search.New(groups, items, config.Inventory, config.Goals)
-	goal := Goal{Item: "block.minecraft.white_bed"}
-	for _, candidate := range finder.JunklessSubstrings(goal.Item) {
-		goal.Substrings = append(goal.Substrings, candidate.Sub)
+	bindings := layout.LayeredLayout{NonShift: got.Bindings, Shift: got.ShiftBindings}
+	if cost := layout.LayeredCost(bindings, goals, weights); math.Abs(got.Cost-cost) > 1e-7 {
+		t.Fatalf("profile optimizer cost %v != rescored %v", got.Cost, cost)
 	}
-	if _, err := WithPreferredSearches([]Goal{goal}, map[string][]string{goal.Item: {"l ", "n "}}); err != nil {
+	for _, assigned := range []layout.Layout{got.Bindings, got.ShiftBindings} {
+		seen := make(map[string]bool, len(assigned))
+		for ch, key := range assigned {
+			if seen[key] {
+				t.Fatalf("two characters share key %q in one layer", key)
+			}
+			seen[key] = true
+			if _, known := weights.Keys[key]; !known {
+				t.Fatalf("unknown key %q for %q", key, ch)
+			}
+		}
+	}
+	for _, plan := range got.GroupPlans {
+		assertPlanReplay(t, plan, bindings)
+	}
+	again, err := layout.PlanLayeredGroups(bindings, goals, weights)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(again) != len(got.GroupPlans) {
+		t.Fatal("group report count mismatch")
+	}
+	for i, plan := range again {
+		if math.Abs(plan.Cost-got.GroupPlans[i].Cost) > 1e-7 {
+			t.Fatalf("group report cost changed: %+v, %+v", plan, got.GroupPlans[i])
+		}
+	}
+}
+
+func assertPlanReplay(t *testing.T, plan layout.GroupPlan, bindings layout.LayeredLayout) {
+	t.Helper()
+	text, layer, sum := "", layout.NonShiftLayer, 0.0
+	for _, step := range plan.Steps {
+		if step.LayerChange != (layer != step.Layer) {
+			t.Fatalf("wrong Shift change marker: %+v", step)
+		}
+		layer = step.Layer
+		if step.Backspaces > 1 {
+			t.Fatalf("multiple Backspaces: %+v", step)
+		}
+		switch step.Action {
+		case "shift-home":
+			text = ""
+		case "backspace":
+			text = string([]rune(text)[:len([]rune(text))-step.Backspaces])
+		}
+		for _, ch := range step.Type {
+			if _, known := bindings.Bindings(layer)[ch]; !known {
+				t.Fatalf("text %q is unreachable on %s", step.Type, layer)
+			}
+		}
+		text += step.Type
+		if text != step.Search {
+			t.Fatalf("actions produced %q instead of %q", text, step.Search)
+		}
+		sum += step.Cost
+	}
+	if math.Abs(sum-plan.Cost) > 1e-7 {
+		t.Fatalf("reported step costs %v != plan cost %v", sum, plan.Cost)
 	}
 }

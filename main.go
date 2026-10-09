@@ -1,42 +1,63 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
-	"louxylayout/internal/config"
 	"louxylayout/internal/data"
 	"louxylayout/internal/layout"
+	"louxylayout/internal/profile"
 	"louxylayout/internal/search"
+	"louxylayout/profiles"
 	"sort"
 	"time"
 )
 
 func main() {
+	profileName := flag.String("profile", profiles.Default, "profile name or path to a JSON profile")
+	listProfiles := flag.Bool("list-profiles", false, "list available profiles and exit")
+	flag.Parse()
+	if flag.NArg() != 0 {
+		log.Fatal("unexpected positional arguments; use -profile <name-or-path>")
+	}
+	if *listProfiles {
+		names, err := profile.List()
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, name := range names {
+			suffix := ""
+			if name == profiles.Default {
+				suffix = " (default)"
+			}
+			fmt.Println(name + suffix)
+		}
+		return
+	}
 	started := time.Now()
-	weights := layout.KeyboardWeights
-	options := layout.OptimizeOptions{Seed: 42, Fixed: layout.Layout{' ': "Space"}, InitialBindings: layout.PreferredBindings, InitialShiftBindings: layout.PreferredShiftBindings, EnableShiftLayer: true}
-	groups, items, err := data.Load(config.Language)
+	personal, err := profile.Load(*profileName)
 	if err != nil {
 		log.Fatal(err)
 	}
-	finder := search.New(groups, items, config.Inventory, config.Goals)
+	weights, options, err := personal.Settings()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Profile: %s", *profileName)
+	if personal.Name != *profileName {
+		fmt.Printf(" (%s)", personal.Name)
+	}
+	fmt.Println()
+	groups, items, err := data.Load(personal.Language)
+	if err != nil {
+		log.Fatal(err)
+	}
+	finder := search.New(groups, items, personal.Inventory, personal.Goals)
 	fmt.Printf("Loaded %d recipe groups\n", len(groups))
 	fmt.Printf("Found %d craftable items\n", finder.CraftableCount())
 	fmt.Print("\n----------------------------------------------\n\n")
 
-	var goals []layout.Goal
-	for _, item := range config.Goals {
-		goal := layout.Goal{Item: item}
-		candidates := finder.JunklessSubstrings(item)
-		if config.AllowGoodJunk {
-			candidates = finder.ShortestUniqueSubstringWithJunk(item)
-		}
-		for _, candidate := range candidates {
-			goal.Substrings = append(goal.Substrings, candidate.Sub)
-		}
-		goals = append(goals, goal)
-	}
-	goals, err = layout.WithPreferredSearches(goals, config.PreferredSearches)
+	goals, err := personal.BuildGoals(finder)
 	if err != nil {
 		log.Fatal(err)
 	}
