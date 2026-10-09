@@ -15,6 +15,8 @@ The CLI uses **roux** by default. Personal settings live in
 go run .                              # your profile
 go run . -profile roux                 # select it explicitly
 go run . -list-profiles                # list available profiles
+go run . -profile lily                 # Elfdalian, ESDF, preferred searches
+go run . -profile roux-actual          # Roux with specified actual searches and junk
 go run . -profile friend               # profiles/friend.json
 go run . -profile /path/to/friend.json # load a file elsewhere
 ```
@@ -30,6 +32,7 @@ A profile contains:
 
 - `language`, `inventory`, `goals`, and `allow_good_junk`.
 - `preferred_searches`: allowed searches per item; preserve trailing spaces.
+- `allowed_junk_searches`: exact per-item exceptions that may match non-goal crafts.
 - `weights`: physical key costs and positions, transitions, craft priorities,
   layer preferences, shared-character preferences, groups, and `before` rules.
 - `preferred_bindings` and `preferred_shift_bindings`: movable starting bindings.
@@ -61,6 +64,22 @@ guarantee of a globally optimal layout. Profile loading adds no optimizer states
 Set `language` to `"en_gb"` for English, `"no_no"` for Norwegian, or `"ovd"` for
 Elfdalian. Language and recipe JSON are embedded at build time.
 
+### Lily's ESDF profile
+
+[`profiles/lily.json`](profiles/lily.json) uses Elfdalian (`ovd`), the same goals
+and inventory as Roux, and the supplied ESDF key efforts and finger assignments.
+Space retains its existing cost. Coordinates follow physical QWERTY rows.
+Transition overrides were shifted one key right within each row; missing
+horizontal-neighbour costs use the nearest transferred directional cost, with
+same-finger penalties for unmeasured same-finger pairs. Other transitions use the fallback costs and physical-distance penalty, without
+additional cross-row overrides.
+
+`_` in the supplied searches was converted to a literal space. Searches for items
+outside the current goals were omitted. Unspecified groups, priorities, layer
+preferences, penalties and optimizer controls were copied into Lily's file when
+it was created. These files are independent: missing fields do not inherit from
+Roux, and later edits to Roux do not alter Lily.
+
 ## Search preferences and junk
 
 `preferred_searches` restricts a goal to the listed valid searches:
@@ -79,8 +98,26 @@ minimum-character selection, optimization, and reporting.
 `allow_good_junk` defaults to false, rejecting avoidable matches with other goal
 crafts. Unavoidable matches remain allowed in either mode. Candidate filtering
 uses the 2x2 inventory grid when the target fits, otherwise the 3x3 table.
+For explicitly accepted shortcuts that also match non-goal items, use a narrow
+per-item exception in the profile:
+
+```json
+"allow_good_junk": true,
+"allowed_junk_searches": {
+  "item.minecraft.bow": ["vb"],
+  "item.minecraft.iron_ingot": ["nta"],
+  "block.minecraft.nether_bricks": ["h"]
+}
+```
+
+These exceptions apply only to the listed searches and must still match the
+target's recipe-group names. Other searches keep the normal junk policy.
+`preferred_searches` still controls which searches the optimizer may select.
+Lily uses these three exceptions to retain the supplied Elfdalian shortcuts.
+
 Planning uses the configured inventory; it does not simulate changing ingredients
-as crafts are performed. A shortcut rejected by candidate filtering cannot be used just because it overlaps.
+as crafts are performed. A shortcut rejected by candidate filtering needs an explicit exception; prefix
+overlap alone does not make it valid.
 
 ## Craft priorities and key comfort
 

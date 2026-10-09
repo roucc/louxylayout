@@ -20,6 +20,7 @@ import (
 // Profile is self-contained; omitted personal maps do not inherit from another
 // person's profile. Optimizer controls have the same defaults as the CLI.
 type Profile struct {
+	AllowedJunkSearches    map[string][]string `json:"allowed_junk_searches,omitempty"`
 	Name                   string              `json:"name"`
 	Language               string              `json:"language"`
 	AllowGoodJunk          bool                `json:"allow_good_junk"`

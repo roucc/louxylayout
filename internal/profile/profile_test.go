@@ -212,3 +212,62 @@ func TestNorwegianBedPreferencesAreValid(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAdditionalProfileVariantsProduceLayouts(t *testing.T) {
+	files, err := profiles.Files.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range files {
+		name := strings.TrimSuffix(file.Name(), ".json")
+		if name == profiles.Default {
+			continue
+		}
+		t.Run(name, func(t *testing.T) {
+			encoded, err := profiles.Files.ReadFile(name + ".json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			p, err := Parse(encoded)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if name == "lily-junkless" && (p.AllowGoodJunk || len(p.PreferredSearches) > 0 || len(p.AllowedJunkSearches) > 0) {
+				t.Fatal("junkless variant still has preferred searches or junk allowances")
+			}
+			if name == "roux-english" && p.Language != "en_gb" {
+				t.Fatal("English variant has wrong language")
+			}
+			weights, options, err := p.Settings()
+			if err != nil {
+				t.Fatal(err)
+			}
+			groups, items, err := data.Load(p.Language)
+			if err != nil {
+				t.Fatal(err)
+			}
+			finder := search.New(groups, items, p.Inventory, p.Goals)
+			goals, err := p.BuildGoals(finder)
+			if err != nil {
+				t.Fatal(err)
+			}
+			options.Restarts, options.Iterations = 1, 2
+			result, err := layout.Optimize(goals, weights, options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if name == "roux-actual" {
+				for _, goal := range result.Searches {
+					if allowed := p.PreferredSearches[goal.Item]; len(allowed) > 0 {
+						if len(goal.Substrings) != 1 || goal.Substrings[0] != allowed[0] {
+							t.Fatalf("actual search restriction not respected: %+v", goal)
+						}
+					}
+				}
+			}
+			if len(result.Searches) != len(p.Goals) || result.ShiftBindings == nil {
+				t.Fatal("variant did not produce a complete two-layer layout")
+			}
+		})
+	}
+}

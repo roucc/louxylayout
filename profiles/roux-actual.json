@@ -1,0 +1,500 @@
+{
+  "name": "roux-actual",
+  "language": "no_no",
+  "allow_good_junk": true,
+  "inventory": [
+    "block.minecraft.gravel",
+    "item.minecraft.string",
+    "item.minecraft.nether_brick",
+    "item.minecraft.diamond",
+    "block.minecraft.white_wool",
+    "item.minecraft.gunpowder",
+    "item.minecraft.iron_nugget",
+    "item.minecraft.coal",
+    "block.minecraft.nether_bricks",
+    "block.minecraft.sand",
+    "item.minecraft.carrot",
+    "block.minecraft.oak_slab",
+    "item.minecraft.apple",
+    "item.minecraft.ender_pearl",
+    "item.minecraft.stick",
+    "block.minecraft.obsidian",
+    "item.minecraft.blaze_rod",
+    "block.minecraft.crying_obsidian",
+    "item.minecraft.leather",
+    "block.minecraft.soul_sand",
+    "item.minecraft.iron_ingot",
+    "item.minecraft.gold_ingot",
+    "item.minecraft.gold_nugget",
+    "block.minecraft.glowstone",
+    "block.minecraft.oak_log",
+    "item.minecraft.glowstone_dust",
+    "block.minecraft.dirt",
+    "item.minecraft.flint",
+    "item.minecraft.blaze_powder",
+    "block.minecraft.cobblestone",
+    "item.minecraft.wheat",
+    "block.minecraft.blackstone",
+    "block.minecraft.oak_planks",
+    "block.minecraft.sandstone",
+    "block.minecraft.mossy_stone_bricks"
+  ],
+  "goals": [
+    "block.minecraft.white_bed",
+    "block.minecraft.respawn_anchor",
+    "item.minecraft.bow",
+    "item.minecraft.golden_pickaxe",
+    "item.minecraft.iron_axe",
+    "item.minecraft.stone_axe",
+    "item.minecraft.iron_sword",
+    "item.minecraft.stone_sword",
+    "item.minecraft.gold_ingot",
+    "item.minecraft.iron_ingot",
+    "block.minecraft.white_wool",
+    "block.minecraft.glowstone",
+    "block.minecraft.nether_bricks",
+    "item.minecraft.stick",
+    "item.minecraft.golden_carrot",
+    "item.minecraft.golden_helmet",
+    "item.minecraft.flint_and_steel",
+    "item.minecraft.bread",
+    "item.minecraft.iron_pickaxe",
+    "item.minecraft.blaze_powder",
+    "item.minecraft.ender_eye",
+    "item.minecraft.bucket",
+    "item.minecraft.diamond_sword",
+    "item.minecraft.stone_shovel",
+    "item.minecraft.oak_boat",
+    "block.minecraft.oak_planks"
+  ],
+  "preferred_searches": {
+    "item.minecraft.golden_pickaxe": [
+      "lha"
+    ],
+    "block.minecraft.respawn_anchor": [
+      "iv"
+    ],
+    "item.minecraft.bread": [
+      "rø"
+    ],
+    "item.minecraft.diamond_sword": [
+      "6"
+    ],
+    "item.minecraft.flint_and_steel": [
+      "å"
+    ],
+    "block.minecraft.nether_bricks": [
+      "he"
+    ]
+  },
+  "preferred_bindings": {},
+  "preferred_shift_bindings": {},
+  "fixed_bindings": {
+    "Space": "Space"
+  },
+  "fixed_shift_bindings": {
+    "Space": "Space"
+  },
+  "weights": {
+    "keys": {
+      "1": {
+        "effort": 2.5,
+        "finger": "middle",
+        "x": 0,
+        "y": 0
+      },
+      "2": {
+        "effort": 1.8,
+        "finger": "middle",
+        "x": 1,
+        "y": 0
+      },
+      "3": {
+        "effort": 2,
+        "finger": "index",
+        "x": 2,
+        "y": 0
+      },
+      "4": {
+        "effort": 2,
+        "finger": "index",
+        "x": 3,
+        "y": 0
+      },
+      "A": {
+        "effort": 1,
+        "finger": "pinky",
+        "x": 0.25,
+        "y": 2
+      },
+      "C": {
+        "effort": 1.5,
+        "finger": "index",
+        "x": 2.75,
+        "y": 3
+      },
+      "D": {
+        "effort": 1,
+        "finger": "index",
+        "x": 2.25,
+        "y": 2
+      },
+      "E": {
+        "effort": 1.5,
+        "finger": "index",
+        "x": 2,
+        "y": 1
+      },
+      "F": {
+        "effort": 1.5,
+        "finger": "index",
+        "x": 3.25,
+        "y": 2
+      },
+      "G": {
+        "effort": 2.5,
+        "finger": "index",
+        "x": 4.25,
+        "y": 2
+      },
+      "Q": {
+        "effort": 1.4,
+        "finger": "ring",
+        "x": 0,
+        "y": 1
+      },
+      "R": {
+        "effort": 1.6,
+        "finger": "index",
+        "x": 3,
+        "y": 1
+      },
+      "S": {
+        "effort": 1.2,
+        "finger": "middle",
+        "x": 1.25,
+        "y": 2
+      },
+      "Space": {
+        "effort": 1,
+        "finger": "thumb",
+        "x": 3,
+        "y": 4
+      },
+      "V": {
+        "effort": 2.5,
+        "finger": "index",
+        "x": 3.75,
+        "y": 3
+      },
+      "W": {
+        "effort": 1,
+        "finger": "middle",
+        "x": 1,
+        "y": 1
+      },
+      "X": {
+        "effort": 2,
+        "finger": "middle",
+        "x": 1.75,
+        "y": 3
+      },
+      "Z": {
+        "effort": 2,
+        "finger": "ring",
+        "x": 0.75,
+        "y": 3
+      }
+    },
+    "crafts": {
+      "block.minecraft.glowstone": 3,
+      "block.minecraft.nether_bricks": 3,
+      "block.minecraft.respawn_anchor": 5,
+      "block.minecraft.white_bed": 5,
+      "block.minecraft.white_wool": 3,
+      "item.minecraft.blaze_powder": 1,
+      "item.minecraft.bow": 5,
+      "item.minecraft.bread": 2,
+      "item.minecraft.bucket": 1,
+      "item.minecraft.diamond_sword": 0.5,
+      "item.minecraft.ender_eye": 1,
+      "item.minecraft.flint_and_steel": 2,
+      "item.minecraft.gold_ingot": 3,
+      "item.minecraft.golden_carrot": 2,
+      "item.minecraft.golden_helmet": 2,
+      "item.minecraft.golden_pickaxe": 5,
+      "item.minecraft.iron_axe": 4,
+      "item.minecraft.iron_ingot": 3,
+      "item.minecraft.iron_pickaxe": 2,
+      "item.minecraft.iron_sword": 4,
+      "item.minecraft.oak_boat": 0.5,
+      "item.minecraft.oak_planks": 0.5,
+      "item.minecraft.stick": 3,
+      "item.minecraft.stone_axe": 4,
+      "item.minecraft.stone_hoe": 2,
+      "item.minecraft.stone_shovel": 0.5,
+      "item.minecraft.stone_sword": 4
+    },
+    "preferred_layers": {
+      "block.minecraft.glowstone": "shift",
+      "block.minecraft.nether_bricks": "shift",
+      "block.minecraft.respawn_anchor": "non-shift",
+      "block.minecraft.white_bed": "shift",
+      "block.minecraft.white_wool": "shift",
+      "item.minecraft.blaze_powder": "shift",
+      "item.minecraft.bow": "non-shift",
+      "item.minecraft.bread": "shift",
+      "item.minecraft.bucket": "non-shift",
+      "item.minecraft.diamond_sword": "non-shift",
+      "item.minecraft.ender_eye": "shift",
+      "item.minecraft.flint_and_steel": "any",
+      "item.minecraft.gold_ingot": "shift",
+      "item.minecraft.golden_carrot": "shift",
+      "item.minecraft.golden_helmet": "any",
+      "item.minecraft.golden_pickaxe": "shift",
+      "item.minecraft.iron_axe": "non-shift",
+      "item.minecraft.iron_ingot": "shift",
+      "item.minecraft.iron_pickaxe": "non-shift",
+      "item.minecraft.iron_sword": "non-shift",
+      "item.minecraft.oak_boat": "non-shift",
+      "item.minecraft.stick": "non-shift",
+      "item.minecraft.stone_axe": "non-shift",
+      "item.minecraft.stone_hoe": "shift",
+      "item.minecraft.stone_shovel": "non-shift",
+      "item.minecraft.stone_sword": "non-shift"
+    },
+    "layer_preference_penalty": 5,
+    "layer_switch_penalty": 0.5,
+    "prefer_both_layers": {
+      "n": 5
+    },
+    "groups": [
+      {
+        "name": "fortress",
+        "priority": 4,
+        "crafts": [
+          "item.minecraft.bow",
+          "block.minecraft.respawn_anchor",
+          "block.minecraft.white_bed",
+          "item.minecraft.golden_pickaxe"
+        ]
+      },
+      {
+        "name": "bastion",
+        "priority": 3,
+        "crafts": [
+          "block.minecraft.white_bed",
+          "item.minecraft.iron_ingot",
+          "item.minecraft.iron_axe",
+          "item.minecraft.iron_sword"
+        ],
+        "before": {
+          "item.minecraft.iron_ingot": [
+            "item.minecraft.iron_axe",
+            "item.minecraft.iron_sword"
+          ]
+        }
+      },
+      {
+        "name": "bastion2",
+        "priority": 3,
+        "crafts": [
+          "block.minecraft.white_bed",
+          "item.minecraft.stone_axe",
+          "item.minecraft.stone_sword"
+        ]
+      },
+      {
+        "name": "2x2",
+        "priority": 2,
+        "crafts": [
+          "block.minecraft.white_wool",
+          "block.minecraft.nether_bricks",
+          "block.minecraft.glowstone",
+          "item.minecraft.stick"
+        ]
+      },
+      {
+        "name": "chalice",
+        "priority": 1,
+        "crafts": [
+          "item.minecraft.golden_helmet",
+          "item.minecraft.golden_pickaxe"
+        ]
+      },
+      {
+        "name": "eyes",
+        "priority": 1,
+        "crafts": [
+          "item.minecraft.blaze_powder",
+          "item.minecraft.ender_eye"
+        ]
+      },
+      {
+        "name": "ow1",
+        "priority": 1,
+        "crafts": [
+          "item.minecraft.stone_shovel",
+          "item.minecraft.stone_axe"
+        ]
+      },
+      {
+        "name": "ow2",
+        "priority": 1,
+        "crafts": [
+          "item.minecraft.bucket",
+          "item.minecraft.flint_and_steel",
+          "item.minecraft.oak_boat"
+        ]
+      },
+      {
+        "name": "ocean",
+        "priority": 1,
+        "crafts": [
+          "item.minecraft.bread",
+          "item.minecraft.iron_ingot"
+        ]
+      }
+    ],
+    "search_editing": {
+      "shift_home": 1,
+      "backspace": 0.5
+    },
+    "distance_penalty": 1,
+    "finger_reuse_penalty": 1,
+    "same_finger_penalty": 1,
+    "default_transition_penalty": 0.5,
+    "transitions": [
+      {
+        "from": "1",
+        "to": "2",
+        "cost": 0.2
+      },
+      {
+        "from": "2",
+        "to": "1",
+        "cost": 0.7
+      },
+      {
+        "from": "2",
+        "to": "3",
+        "cost": 0.2
+      },
+      {
+        "from": "3",
+        "to": "2",
+        "cost": 0.2
+      },
+      {
+        "from": "3",
+        "to": "4",
+        "cost": 0.3
+      },
+      {
+        "from": "4",
+        "to": "3",
+        "cost": 0.3
+      },
+      {
+        "from": "A",
+        "to": "S",
+        "cost": 0.1
+      },
+      {
+        "from": "A",
+        "to": "W",
+        "cost": 0.2
+      },
+      {
+        "from": "D",
+        "to": "F",
+        "cost": 0.2
+      },
+      {
+        "from": "D",
+        "to": "S",
+        "cost": 0.4
+      },
+      {
+        "from": "D",
+        "to": "W",
+        "cost": 0.1
+      },
+      {
+        "from": "E",
+        "to": "R",
+        "cost": 0.3
+      },
+      {
+        "from": "E",
+        "to": "W",
+        "cost": 0.1
+      },
+      {
+        "from": "F",
+        "to": "D",
+        "cost": 0.2
+      },
+      {
+        "from": "Q",
+        "to": "W",
+        "cost": 0.3
+      },
+      {
+        "from": "R",
+        "to": "E",
+        "cost": 0.4
+      },
+      {
+        "from": "S",
+        "to": "A",
+        "cost": 0.1
+      },
+      {
+        "from": "S",
+        "to": "D",
+        "cost": 0.1
+      },
+      {
+        "from": "W",
+        "to": "A",
+        "cost": 0.1
+      },
+      {
+        "from": "W",
+        "to": "D",
+        "cost": 0.1
+      },
+      {
+        "from": "W",
+        "to": "E",
+        "cost": 0.1
+      },
+      {
+        "from": "W",
+        "to": "Q",
+        "cost": 0.7
+      }
+    ]
+  },
+  "optimizer": {
+    "seed": 42,
+    "restarts": 8,
+    "iterations": 4000,
+    "enable_shift_layer": true
+  },
+  "allowed_junk_searches": {
+    "block.minecraft.respawn_anchor": [
+      "iv"
+    ],
+    "item.minecraft.diamond_sword": [
+      "6"
+    ],
+    "item.minecraft.flint_and_steel": [
+      "å"
+    ],
+    "item.minecraft.bread": [
+      "rø"
+    ]
+  }
+}
