@@ -1,7 +1,7 @@
 {
   "name": "roux-actual",
   "language": "no_no",
-  "allow_good_junk": true,
+  "allow_good_junk": false,
   "inventory": [
     "block.minecraft.gravel",
     "item.minecraft.string",
@@ -63,9 +63,7 @@
     "item.minecraft.ender_eye",
     "item.minecraft.bucket",
     "item.minecraft.diamond_sword",
-    "item.minecraft.stone_shovel",
-    "item.minecraft.oak_boat",
-    "block.minecraft.oak_planks"
+    "item.minecraft.oak_boat"
   ],
   "preferred_searches": {
     "item.minecraft.golden_pickaxe": [
@@ -76,9 +74,6 @@
     ],
     "item.minecraft.bread": [
       "rø"
-    ],
-    "item.minecraft.diamond_sword": [
-      "6"
     ],
     "item.minecraft.flint_and_steel": [
       "å"
@@ -696,9 +691,6 @@
   "allowed_junk_searches": {
     "block.minecraft.respawn_anchor": [
       "iv"
-    ],
-    "item.minecraft.diamond_sword": [
-      "6"
     ],
     "item.minecraft.flint_and_steel": [
       "å"

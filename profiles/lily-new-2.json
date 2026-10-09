@@ -1,0 +1,994 @@
+{
+  "name": "lily-new-2",
+  "language": "ovd",
+  "allow_good_junk": true,
+  "inventory": [
+    "block.minecraft.gravel",
+    "item.minecraft.string",
+    "item.minecraft.nether_brick",
+    "item.minecraft.diamond",
+    "block.minecraft.white_wool",
+    "item.minecraft.gunpowder",
+    "item.minecraft.iron_nugget",
+    "item.minecraft.coal",
+    "block.minecraft.nether_bricks",
+    "block.minecraft.sand",
+    "item.minecraft.carrot",
+    "block.minecraft.oak_slab",
+    "item.minecraft.apple",
+    "item.minecraft.ender_pearl",
+    "item.minecraft.stick",
+    "block.minecraft.obsidian",
+    "item.minecraft.blaze_rod",
+    "block.minecraft.crying_obsidian",
+    "item.minecraft.leather",
+    "block.minecraft.soul_sand",
+    "item.minecraft.iron_ingot",
+    "item.minecraft.gold_ingot",
+    "item.minecraft.gold_nugget",
+    "block.minecraft.glowstone",
+    "block.minecraft.oak_log",
+    "item.minecraft.glowstone_dust",
+    "block.minecraft.dirt",
+    "item.minecraft.flint",
+    "item.minecraft.blaze_powder",
+    "block.minecraft.cobblestone",
+    "item.minecraft.wheat",
+    "block.minecraft.blackstone",
+    "block.minecraft.oak_planks",
+    "block.minecraft.sandstone",
+    "block.minecraft.mossy_stone_bricks"
+  ],
+  "goals": [
+    "block.minecraft.respawn_anchor",
+    "item.minecraft.bow",
+    "block.minecraft.white_bed",
+    "item.minecraft.golden_pickaxe",
+    "item.minecraft.iron_ingot",
+    "item.minecraft.iron_axe",
+    "item.minecraft.iron_sword",
+    "item.minecraft.golden_carrot",
+    "block.minecraft.white_wool",
+    "item.minecraft.stick",
+    "block.minecraft.nether_bricks",
+    "block.minecraft.glowstone",
+    "item.minecraft.golden_helmet",
+    "item.minecraft.stone_axe",
+    "item.minecraft.stone_shovel",
+    "item.minecraft.stone_sword",
+    "item.minecraft.bucket",
+    "item.minecraft.flint_and_steel",
+    "item.minecraft.iron_pickaxe",
+    "item.minecraft.iron_shovel",
+    "item.minecraft.bread",
+    "item.minecraft.diamond_shovel",
+    "item.minecraft.diamond_sword",
+    "item.minecraft.gold_ingot",
+    "block.minecraft.tnt"
+  ],
+  "preferred_searches": {
+    "item.minecraft.bow": [
+      "vb"
+    ],
+    "item.minecraft.iron_ingot": [
+      "nta"
+    ],
+    "block.minecraft.nether_bricks": [
+      "h"
+    ],
+    "item.minecraft.flint_and_steel": [
+      "äl"
+    ],
+    "block.minecraft.tnt": [
+      "yn"
+    ],
+    "block.minecraft.white_bed": [
+      "sai"
+    ]
+  },
+  "preferred_bindings": {},
+  "preferred_shift_bindings": {},
+  "fixed_bindings": {
+    "Space": "Space"
+  },
+  "fixed_shift_bindings": {
+    "Space": "Space"
+  },
+  "weights": {
+    "keys": {
+      "E": {
+        "effort": 1.0,
+        "finger": "middle",
+        "x": 2,
+        "y": 1
+      },
+      "S": {
+        "effort": 1.1,
+        "finger": "ring",
+        "x": 1.25,
+        "y": 2
+      },
+      "D": {
+        "effort": 1.0,
+        "finger": "middle",
+        "x": 2.25,
+        "y": 2
+      },
+      "F": {
+        "effort": 1.1,
+        "finger": "index",
+        "x": 3.25,
+        "y": 2
+      },
+      "A": {
+        "effort": 1.2,
+        "finger": "ring",
+        "x": 0.25,
+        "y": 2
+      },
+      "Q": {
+        "effort": 1.3,
+        "finger": "ring",
+        "x": 0,
+        "y": 1
+      },
+      "W": {
+        "effort": 1.75,
+        "finger": "middle",
+        "x": 1,
+        "y": 1
+      },
+      "R": {
+        "effort": 1.2,
+        "finger": "index",
+        "x": 3,
+        "y": 1
+      },
+      "T": {
+        "effort": 1.8,
+        "finger": "index",
+        "x": 4,
+        "y": 1
+      },
+      "G": {
+        "effort": 1.4,
+        "finger": "index",
+        "x": 4.25,
+        "y": 2
+      },
+      "H": {
+        "effort": 2.0,
+        "finger": "index",
+        "x": 5.25,
+        "y": 2
+      },
+      "X": {
+        "effort": 1.75,
+        "finger": "middle",
+        "x": 1.75,
+        "y": 3
+      },
+      "C": {
+        "effort": 1.5,
+        "finger": "index",
+        "x": 2.75,
+        "y": 3
+      },
+      "V": {
+        "effort": 1.6,
+        "finger": "thumb",
+        "x": 3.75,
+        "y": 3
+      },
+      "B": {
+        "effort": 1.8,
+        "finger": "thumb",
+        "x": 4.75,
+        "y": 3
+      },
+      "1": {
+        "effort": 1.6,
+        "finger": "middle",
+        "x": 0,
+        "y": 0
+      },
+      "2": {
+        "effort": 1.5,
+        "finger": "index",
+        "x": 1,
+        "y": 0
+      },
+      "3": {
+        "effort": 1.5,
+        "finger": "middle",
+        "x": 2,
+        "y": 0
+      },
+      "4": {
+        "effort": 1.4,
+        "finger": "middle",
+        "x": 3,
+        "y": 0
+      },
+      "5": {
+        "effort": 1.4,
+        "finger": "index",
+        "x": 4,
+        "y": 0
+      },
+      "Space": {
+        "effort": 1,
+        "finger": "thumb",
+        "x": 3,
+        "y": 4
+      }
+    },
+    "crafts": {
+      "block.minecraft.respawn_anchor": 5,
+      "item.minecraft.bow": 5,
+      "block.minecraft.white_bed": 5,
+      "item.minecraft.golden_pickaxe": 5,
+      "item.minecraft.iron_ingot": 4,
+      "item.minecraft.iron_axe": 4,
+      "item.minecraft.iron_sword": 4,
+      "item.minecraft.golden_carrot": 2,
+      "block.minecraft.white_wool": 4,
+      "item.minecraft.stick": 4,
+      "block.minecraft.nether_bricks": 4,
+      "block.minecraft.glowstone": 4,
+      "item.minecraft.golden_helmet": 2,
+      "item.minecraft.stone_axe": 4,
+      "item.minecraft.stone_shovel": 3,
+      "item.minecraft.stone_sword": 3,
+      "item.minecraft.bucket": 3,
+      "item.minecraft.flint_and_steel": 3,
+      "item.minecraft.iron_pickaxe": 4,
+      "item.minecraft.iron_shovel": 3,
+      "item.minecraft.bread": 3,
+      "item.minecraft.diamond_shovel": 1,
+      "item.minecraft.diamond_sword": 2,
+      "item.minecraft.gold_ingot": 4,
+      "block.minecraft.tnt": 1
+    },
+    "preferred_layers": {
+      "block.minecraft.glowstone": "shift",
+      "block.minecraft.nether_bricks": "shift",
+      "block.minecraft.respawn_anchor": "non-shift",
+      "block.minecraft.white_bed": "shift",
+      "block.minecraft.white_wool": "shift",
+      "item.minecraft.bow": "non-shift",
+      "item.minecraft.bread": "shift",
+      "item.minecraft.bucket": "non-shift",
+      "item.minecraft.diamond_sword": "non-shift",
+      "item.minecraft.flint_and_steel": "any",
+      "item.minecraft.gold_ingot": "shift",
+      "item.minecraft.golden_carrot": "shift",
+      "item.minecraft.golden_helmet": "any",
+      "item.minecraft.golden_pickaxe": "shift",
+      "item.minecraft.iron_axe": "non-shift",
+      "item.minecraft.iron_ingot": "shift",
+      "item.minecraft.iron_pickaxe": "non-shift",
+      "item.minecraft.iron_sword": "non-shift",
+      "item.minecraft.stick": "non-shift",
+      "item.minecraft.stone_axe": "non-shift",
+      "item.minecraft.stone_shovel": "non-shift",
+      "item.minecraft.stone_sword": "non-shift"
+    },
+    "layer_preference_penalty": 5,
+    "layer_switch_penalty": 0.5,
+    "prefer_both_layers": {
+      "n": 5
+    },
+    "groups": [
+      {
+        "name": "fortress",
+        "priority": 5,
+        "crafts": [
+          "block.minecraft.respawn_anchor",
+          "item.minecraft.bow",
+          "block.minecraft.white_bed",
+          "item.minecraft.golden_pickaxe"
+        ]
+      },
+      {
+        "name": "bastion",
+        "priority": 4,
+        "crafts": [
+          "block.minecraft.white_bed",
+          "item.minecraft.iron_ingot",
+          "item.minecraft.iron_axe",
+          "item.minecraft.iron_sword",
+          "item.minecraft.golden_carrot",
+          "block.minecraft.white_wool",
+          "item.minecraft.stick"
+        ],
+        "before": {
+          "item.minecraft.iron_ingot": [
+            "item.minecraft.iron_axe",
+            "item.minecraft.iron_sword"
+          ]
+        }
+      },
+      {
+        "name": "2x2",
+        "priority": 4,
+        "crafts": [
+          "block.minecraft.nether_bricks",
+          "block.minecraft.white_wool",
+          "item.minecraft.stick",
+          "block.minecraft.glowstone"
+        ]
+      },
+      {
+        "name": "chalice",
+        "priority": 3,
+        "crafts": [
+          "item.minecraft.golden_helmet",
+          "item.minecraft.golden_pickaxe"
+        ]
+      },
+      {
+        "name": "owmain",
+        "priority": 3,
+        "crafts": [
+          "item.minecraft.stone_axe",
+          "item.minecraft.stone_shovel",
+          "item.minecraft.stone_sword",
+          "item.minecraft.bucket",
+          "item.minecraft.flint_and_steel"
+        ]
+      },
+      {
+        "name": "owiron",
+        "priority": 2,
+        "crafts": [
+          "item.minecraft.iron_pickaxe",
+          "item.minecraft.iron_ingot",
+          "item.minecraft.iron_shovel",
+          "item.minecraft.iron_axe",
+          "item.minecraft.bread"
+        ],
+        "before": {
+          "item.minecraft.iron_ingot": [
+            "item.minecraft.iron_pickaxe",
+            "item.minecraft.iron_shovel",
+            "item.minecraft.iron_axe"
+          ]
+        }
+      },
+      {
+        "name": "owother",
+        "priority": 1,
+        "crafts": [
+          "item.minecraft.diamond_shovel",
+          "item.minecraft.diamond_sword",
+          "item.minecraft.gold_ingot",
+          "block.minecraft.tnt"
+        ]
+      }
+    ],
+    "search_editing": {
+      "shift_home": 1,
+      "backspace": 0.5
+    },
+    "distance_penalty": 1,
+    "finger_reuse_penalty": 1,
+    "same_finger_penalty": 1,
+    "default_transition_penalty": 0.5,
+    "transitions": [
+      {
+        "from": "1",
+        "to": "2",
+        "cost": 0.2
+      },
+      {
+        "from": "1",
+        "to": "A",
+        "cost": 1.0
+      },
+      {
+        "from": "1",
+        "to": "C",
+        "cost": 1.0
+      },
+      {
+        "from": "1",
+        "to": "D",
+        "cost": 2.0
+      },
+      {
+        "from": "1",
+        "to": "E",
+        "cost": 2.0
+      },
+      {
+        "from": "1",
+        "to": "S",
+        "cost": 1.0
+      },
+      {
+        "from": "1",
+        "to": "W",
+        "cost": 2.0
+      },
+      {
+        "from": "1",
+        "to": "X",
+        "cost": 2.0
+      },
+      {
+        "from": "2",
+        "to": "1",
+        "cost": 0.7
+      },
+      {
+        "from": "2",
+        "to": "3",
+        "cost": 0.2
+      },
+      {
+        "from": "2",
+        "to": "A",
+        "cost": 1.0
+      },
+      {
+        "from": "2",
+        "to": "C",
+        "cost": 2.0
+      },
+      {
+        "from": "2",
+        "to": "D",
+        "cost": 1.0
+      },
+      {
+        "from": "2",
+        "to": "E",
+        "cost": 1.0
+      },
+      {
+        "from": "2",
+        "to": "Q",
+        "cost": 1.0
+      },
+      {
+        "from": "2",
+        "to": "S",
+        "cost": 1.0
+      },
+      {
+        "from": "2",
+        "to": "X",
+        "cost": 1.0
+      },
+      {
+        "from": "3",
+        "to": "2",
+        "cost": 0.7
+      },
+      {
+        "from": "3",
+        "to": "4",
+        "cost": 0.2
+      },
+      {
+        "from": "3",
+        "to": "A",
+        "cost": 1.0
+      },
+      {
+        "from": "3",
+        "to": "C",
+        "cost": 1.0
+      },
+      {
+        "from": "3",
+        "to": "D",
+        "cost": 2.0
+      },
+      {
+        "from": "3",
+        "to": "Q",
+        "cost": 1.0
+      },
+      {
+        "from": "3",
+        "to": "S",
+        "cost": 1.0
+      },
+      {
+        "from": "3",
+        "to": "W",
+        "cost": 2.0
+      },
+      {
+        "from": "3",
+        "to": "X",
+        "cost": 2.0
+      },
+      {
+        "from": "4",
+        "to": "3",
+        "cost": 0.2
+      },
+      {
+        "from": "4",
+        "to": "5",
+        "cost": 0.3
+      },
+      {
+        "from": "5",
+        "to": "4",
+        "cost": 0.3
+      },
+      {
+        "from": "A",
+        "to": "1",
+        "cost": 1.0
+      },
+      {
+        "from": "A",
+        "to": "2",
+        "cost": 1.0
+      },
+      {
+        "from": "A",
+        "to": "3",
+        "cost": 1.0
+      },
+      {
+        "from": "A",
+        "to": "C",
+        "cost": 1.0
+      },
+      {
+        "from": "A",
+        "to": "E",
+        "cost": 1.0
+      },
+      {
+        "from": "A",
+        "to": "Q",
+        "cost": 2.0
+      },
+      {
+        "from": "A",
+        "to": "S",
+        "cost": 1.1
+      },
+      {
+        "from": "A",
+        "to": "W",
+        "cost": 1.0
+      },
+      {
+        "from": "A",
+        "to": "X",
+        "cost": 1.0
+      },
+      {
+        "from": "B",
+        "to": "V",
+        "cost": 1.5
+      },
+      {
+        "from": "C",
+        "to": "1",
+        "cost": 1.0
+      },
+      {
+        "from": "C",
+        "to": "2",
+        "cost": 2.0
+      },
+      {
+        "from": "C",
+        "to": "3",
+        "cost": 1.0
+      },
+      {
+        "from": "C",
+        "to": "A",
+        "cost": 1.0
+      },
+      {
+        "from": "C",
+        "to": "D",
+        "cost": 1.0
+      },
+      {
+        "from": "C",
+        "to": "E",
+        "cost": 1.0
+      },
+      {
+        "from": "C",
+        "to": "Q",
+        "cost": 1.0
+      },
+      {
+        "from": "C",
+        "to": "S",
+        "cost": 1.0
+      },
+      {
+        "from": "C",
+        "to": "V",
+        "cost": 0.5
+      },
+      {
+        "from": "C",
+        "to": "W",
+        "cost": 1.0
+      },
+      {
+        "from": "C",
+        "to": "X",
+        "cost": 0.5
+      },
+      {
+        "from": "D",
+        "to": "1",
+        "cost": 2.0
+      },
+      {
+        "from": "D",
+        "to": "2",
+        "cost": 1.0
+      },
+      {
+        "from": "D",
+        "to": "3",
+        "cost": 2.0
+      },
+      {
+        "from": "D",
+        "to": "C",
+        "cost": 1.0
+      },
+      {
+        "from": "D",
+        "to": "E",
+        "cost": 2.0
+      },
+      {
+        "from": "D",
+        "to": "F",
+        "cost": 0.1
+      },
+      {
+        "from": "D",
+        "to": "Q",
+        "cost": 1.0
+      },
+      {
+        "from": "D",
+        "to": "S",
+        "cost": 0.1
+      },
+      {
+        "from": "D",
+        "to": "W",
+        "cost": 2.0
+      },
+      {
+        "from": "D",
+        "to": "X",
+        "cost": 2.0
+      },
+      {
+        "from": "E",
+        "to": "1",
+        "cost": 2.0
+      },
+      {
+        "from": "E",
+        "to": "2",
+        "cost": 1.0
+      },
+      {
+        "from": "E",
+        "to": "A",
+        "cost": 1.0
+      },
+      {
+        "from": "E",
+        "to": "C",
+        "cost": 1.0
+      },
+      {
+        "from": "E",
+        "to": "D",
+        "cost": 2.0
+      },
+      {
+        "from": "E",
+        "to": "F",
+        "cost": 0.1
+      },
+      {
+        "from": "E",
+        "to": "R",
+        "cost": 0.1
+      },
+      {
+        "from": "E",
+        "to": "S",
+        "cost": 1.0
+      },
+      {
+        "from": "E",
+        "to": "W",
+        "cost": 0.7
+      },
+      {
+        "from": "E",
+        "to": "X",
+        "cost": 2.0
+      },
+      {
+        "from": "F",
+        "to": "D",
+        "cost": 0.4
+      },
+      {
+        "from": "F",
+        "to": "E",
+        "cost": 0.1
+      },
+      {
+        "from": "F",
+        "to": "G",
+        "cost": 0.2
+      },
+      {
+        "from": "G",
+        "to": "F",
+        "cost": 0.2
+      },
+      {
+        "from": "G",
+        "to": "H",
+        "cost": 1.2
+      },
+      {
+        "from": "H",
+        "to": "G",
+        "cost": 1.2
+      },
+      {
+        "from": "Q",
+        "to": "2",
+        "cost": 1.0
+      },
+      {
+        "from": "Q",
+        "to": "3",
+        "cost": 1.0
+      },
+      {
+        "from": "Q",
+        "to": "A",
+        "cost": 2.0
+      },
+      {
+        "from": "Q",
+        "to": "C",
+        "cost": 1.0
+      },
+      {
+        "from": "Q",
+        "to": "D",
+        "cost": 1.0
+      },
+      {
+        "from": "Q",
+        "to": "S",
+        "cost": 2.0
+      },
+      {
+        "from": "Q",
+        "to": "W",
+        "cost": 0.3
+      },
+      {
+        "from": "Q",
+        "to": "X",
+        "cost": 1.0
+      },
+      {
+        "from": "R",
+        "to": "E",
+        "cost": 0.1
+      },
+      {
+        "from": "R",
+        "to": "T",
+        "cost": 0.3
+      },
+      {
+        "from": "S",
+        "to": "1",
+        "cost": 1.0
+      },
+      {
+        "from": "S",
+        "to": "2",
+        "cost": 1.0
+      },
+      {
+        "from": "S",
+        "to": "3",
+        "cost": 1.0
+      },
+      {
+        "from": "S",
+        "to": "A",
+        "cost": 1.1
+      },
+      {
+        "from": "S",
+        "to": "C",
+        "cost": 1.0
+      },
+      {
+        "from": "S",
+        "to": "D",
+        "cost": 0.1
+      },
+      {
+        "from": "S",
+        "to": "E",
+        "cost": 1.0
+      },
+      {
+        "from": "S",
+        "to": "Q",
+        "cost": 2.0
+      },
+      {
+        "from": "S",
+        "to": "W",
+        "cost": 1.0
+      },
+      {
+        "from": "S",
+        "to": "X",
+        "cost": 1.0
+      },
+      {
+        "from": "T",
+        "to": "R",
+        "cost": 0.4
+      },
+      {
+        "from": "V",
+        "to": "B",
+        "cost": 1.5
+      },
+      {
+        "from": "V",
+        "to": "C",
+        "cost": 0.5
+      },
+      {
+        "from": "W",
+        "to": "1",
+        "cost": 2.0
+      },
+      {
+        "from": "W",
+        "to": "3",
+        "cost": 2.0
+      },
+      {
+        "from": "W",
+        "to": "A",
+        "cost": 1.0
+      },
+      {
+        "from": "W",
+        "to": "C",
+        "cost": 1.0
+      },
+      {
+        "from": "W",
+        "to": "D",
+        "cost": 2.0
+      },
+      {
+        "from": "W",
+        "to": "E",
+        "cost": 0.3
+      },
+      {
+        "from": "W",
+        "to": "Q",
+        "cost": 0.7
+      },
+      {
+        "from": "W",
+        "to": "S",
+        "cost": 1.0
+      },
+      {
+        "from": "W",
+        "to": "X",
+        "cost": 2.0
+      },
+      {
+        "from": "X",
+        "to": "1",
+        "cost": 2.0
+      },
+      {
+        "from": "X",
+        "to": "2",
+        "cost": 1.0
+      },
+      {
+        "from": "X",
+        "to": "3",
+        "cost": 2.0
+      },
+      {
+        "from": "X",
+        "to": "A",
+        "cost": 1.0
+      },
+      {
+        "from": "X",
+        "to": "C",
+        "cost": 0.5
+      },
+      {
+        "from": "X",
+        "to": "D",
+        "cost": 2.0
+      },
+      {
+        "from": "X",
+        "to": "E",
+        "cost": 2.0
+      },
+      {
+        "from": "X",
+        "to": "Q",
+        "cost": 1.0
+      },
+      {
+        "from": "X",
+        "to": "S",
+        "cost": 1.0
+      },
+      {
+        "from": "X",
+        "to": "W",
+        "cost": 2.0
+      }
+    ]
+  },
+  "optimizer": {
+    "seed": 42,
+    "restarts": 8,
+    "iterations": 4000,
+    "enable_shift_layer": true
+  },
+  "allowed_junk_searches": {
+    "item.minecraft.bow": [
+      "vb"
+    ],
+    "item.minecraft.iron_ingot": [
+      "nta"
+    ],
+    "block.minecraft.nether_bricks": [
+      "h"
+    ],
+    "item.minecraft.flint_and_steel": [
+      "äl"
+    ],
+    "block.minecraft.tnt": [
+      "yn"
+    ]
+  }
+}
