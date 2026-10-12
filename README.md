@@ -6,6 +6,42 @@ Run `go run .`, or build an executable with `go build .`. The report shows the
 minimum character set, generation time, physical key bindings on both layers,
 weighted cost, searches, and group crafting sequences. Lower cost is better.
 
+## Choosing an optimizer
+
+```sh
+go run . -profile roux-actual-2 -optimizer annealing # default
+go run . -profile roux-actual-2 -optimizer priority
+```
+
+Both methods use the same cost model and produce the same reports. Lower scores
+are better; neither method guarantees the global minimum.
+
+`priority` constructs searches in descending craft-priority order, assigning
+important searches to cheap keys while considering fingers and transitions.
+Lower-priority characters reserve enough capacity for complete coverage and are
+placed afterward. Fixed bindings remain fixed; preferred bindings are starting
+positions that refinement can move. The first restart uses those starting
+positions; later restarts vary construction choices using the configured seed.
+
+It then uses staged hill climbing: each priority level adds its crafts to the
+active objective, including applicable group costs. Early stages can move
+lower-priority crafts to improve the important ones, while always retaining a
+valid search for every goal. The final stage refines the complete layout against
+the full cost. Moves include swaps, moves into unused keys, character replacements,
+and deletions. Only improving moves (or equally good moves using fewer bindings)
+are accepted; there is no annealing temperature.
+
+Craft priority determines the stages; group priority affects costs within them.
+Both layers, allowed searches, junk policies, and group prerequisites work with
+either optimizer. `optimizer.restarts` controls construction attempts;
+`optimizer.iterations` is the per-restart trial-move budget, split between the
+priority stages and final full-layout refinement. Priority mode may stop early
+when a complete neighbourhood sweep finds no improvement. Its greedy choices
+can get stuck, so compare its result with annealing on your profile.
+
+For Go callers, set `OptimizeOptions.Method` to `"priority"` or call
+`layout.OptimizePriority` directly. An empty method uses annealing.
+
 ## Personal profiles
 
 The CLI uses **roux** by default. Personal settings live in
@@ -153,6 +189,54 @@ Distance and finger-reuse penalties still apply to explicit transition overrides
 An empty finger assignment skips finger penalties. Zero disables an extra
 penalty. Physical key costs and transition tables are shared by both layers.
 
+### Comfort and scoring balance
+
+All profiles now use these starting values under `weights`:
+
+```json
+"finger_reuse_penalty": 3,
+"transition_weight": 0.5,
+"same_finger_movement_penalty": 1.5,
+"long_reach_threshold": 1.5,
+"long_reach_penalty": 0.5,
+"row_change_penalty": 1,
+"worst_craft_penalty": 0.5,
+"group_proximity_weight": 0.25,
+"group_sequence_weight": 1
+```
+
+`transition_weight` scales the base transition table, including the default
+same-finger charge. It leaves effort, distance, finger reuse, and the new movement
+penalty unchanged. Finger reuse charges every pair of presses on the same finger,
+so a three-character search on three different fingers avoids that cost entirely.
+Craft priority scales its standalone cost, making this especially valuable for
+important crafts. These remain soft preferences.
+
+`same_finger_movement_penalty` charges consecutive presses on different keys
+assigned to the same finger, even when the transition has an explicit override.
+Repeating one key still receives finger reuse costs but no movement surcharge.
+`long_reach_penalty` adds `penalty * max(0, distance - threshold)^2` per transition;
+the threshold is measured in key widths. Linear distance costs still apply. `row_change_penalty` adds a cost per row
+crossed between consecutive typing keys. Space is excluded so this does not
+penalize every space-ending search simply for using the thumb key. Horizontal
+rolls receive no row surcharge, and all finger costs still apply.
+
+`worst_craft_penalty` adds a multiple of the largest priority-weighted standalone
+craft cost, encouraging improvements to the most costly craft. On two layers,
+that standalone cost includes layer preference and entering Shift. Group plans
+still choose their own searches and are scored separately.
+
+`group_proximity_weight` scales group proximity independently of
+`group_sequence_weight`, which scales actual typing/editing sequence costs. Both
+also multiply each group's priority. Reported group and step costs remain raw;
+the sequence multiplier is applied when calculating the total layout score.
+
+Omitted multiplier fields default to 1; an explicit 0 disables that component.
+Other new penalties default to 0 for older/custom profiles. Pair costs are
+precomputed for group planning and single-layer optimization; no new search
+states or iterations are introduced. Shared-character layer preferences are
+unchanged.
+
 ### Left-side row changes
 
 All bundled profiles give staggered cross-row moves on the ring/middle side of
@@ -164,8 +248,8 @@ are excluded. Same-finger charges are preserved in the new overrides.
 These transition costs are at least `default_transition_penalty + 0.5`, plus the
 same-finger penalty when applicable. A → Q costs 1.0 in Roux profiles and 2.0 in
 Lily profiles (A and Q both use Lily's ring finger). Key efforts, distance costs,
-and finger-reuse penalties still apply. A priority-5 craft therefore pays 2.5
-additional weighted cost units for an A → Q move compared with the old weights.
+and finger-reuse penalties still apply. With `transition_weight: 0.5`, those base transition costs are halved
+before effort, distance, finger reuse, and movement costs are added.
 
 These are soft penalties, so the optimizer can trade them against the rest of
 the layout. They use the existing transition lookup and shared physical-key
