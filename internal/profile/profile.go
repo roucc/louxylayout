@@ -43,6 +43,15 @@ type Optimizer struct {
 }
 
 type Weights struct {
+	RowChangePenalty          float64  `json:"row_change_penalty"`
+	LongReachPenalty          float64  `json:"long_reach_penalty"`
+	LongReachThreshold        float64  `json:"long_reach_threshold"`
+	SameFingerMovementPenalty float64  `json:"same_finger_movement_penalty"`
+	WorstCraftPenalty         float64  `json:"worst_craft_penalty"`
+	TransitionWeight          *float64 `json:"transition_weight"`
+	GroupProximityWeight      *float64 `json:"group_proximity_weight"`
+	GroupSequenceWeight       *float64 `json:"group_sequence_weight"`
+
 	Keys                     map[string]KeyWeight `json:"keys"`
 	Crafts                   map[string]float64   `json:"crafts"`
 	PreferredLayers          map[string]string    `json:"preferred_layers"`
@@ -203,6 +212,10 @@ func fixedBindings(values map[string]string, keys map[string]KeyWeight) (layout.
 // Settings converts JSON-friendly maps and arrays into optimizer types.
 func (p Profile) Settings() (layout.Weights, layout.OptimizeOptions, error) {
 	w := layout.Weights{
+		RowChangePenalty: p.Weights.RowChangePenalty,
+		LongReachPenalty: p.Weights.LongReachPenalty, LongReachThreshold: p.Weights.LongReachThreshold,
+		SameFingerMovementPenalty: p.Weights.SameFingerMovementPenalty, WorstCraftPenalty: p.Weights.WorstCraftPenalty,
+		TransitionWeight: p.Weights.TransitionWeight, GroupProximityWeight: p.Weights.GroupProximityWeight, GroupSequenceWeight: p.Weights.GroupSequenceWeight,
 		Keys: make(map[string]layout.KeyWeight, len(p.Weights.Keys)), Crafts: p.Weights.Crafts,
 		PreferredLayers: make(map[string]layout.CraftLayer, len(p.Weights.PreferredLayers)), PreferBothLayers: make(map[rune]float64, len(p.Weights.PreferBothLayers)),
 		LayerPreferencePenalty: p.Weights.LayerPreferencePenalty, LayerSwitchPenalty: p.Weights.LayerSwitchPenalty,

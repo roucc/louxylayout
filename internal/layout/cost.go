@@ -32,6 +32,18 @@ type CraftGroup struct {
 // Weights describes physical keys independently of their assigned characters.
 // Use nonnegative, finite values. Lower costs mean easier typing.
 type Weights struct {
+	// LongReachPenalty charges squared distance beyond LongReachThreshold.
+	LongReachPenalty, LongReachThreshold float64
+	// RowChangePenalty charges per row crossed, excluding the Space control.
+	RowChangePenalty float64
+	// SameFingerMovementPenalty applies to different keys sharing a finger,
+	// including explicit transition overrides.
+	SameFingerMovementPenalty float64
+	// WorstCraftPenalty adds the largest priority-weighted standalone craft cost.
+	WorstCraftPenalty float64
+	// Optional multipliers default to 1; an explicit zero disables that component.
+	TransitionWeight, GroupProximityWeight, GroupSequenceWeight *float64
+
 	Keys                     map[string]KeyWeight
 	SameFingerPenalty        float64
 	DefaultTransitionPenalty float64
@@ -94,18 +106,7 @@ func StringCost(substring string, bindings Layout, weights Weights) float64 {
 			fingerUses[weight.Finger]++
 		}
 		if hasPrevious {
-			if weights.DistancePenalty > 0 {
-				previousWeight := weights.Keys[previous]
-				total += weights.DistancePenalty * math.Hypot(weight.X-previousWeight.X, weight.Y-previousWeight.Y)
-			}
-			if penalty, ok := weights.Transitions[Transition{From: previous, To: key}]; ok {
-				total += penalty
-			} else {
-				total += weights.DefaultTransitionPenalty
-				if weight.Finger != "" && weights.Keys[previous].Finger == weight.Finger {
-					total += weights.SameFingerPenalty
-				}
-			}
+			total += keyPairCost(previous, key, weights)
 		}
 		previous, hasPrevious = key, true
 	}
@@ -152,7 +153,7 @@ func groupCost(bindings Layout, searches map[string]string, weights Weights) flo
 						distance += math.Hypot(first.X-second.X, first.Y-second.Y)
 					}
 				}
-				total += group.Priority * (2 / float64(len(active))) * distance / float64(len(from)*len(to))
+				total += multiplier(weights.GroupProximityWeight) * group.Priority * (2 / float64(len(active))) * distance / float64(len(from)*len(to))
 			}
 		}
 	}
@@ -163,6 +164,7 @@ func groupCost(bindings Layout, searches map[string]string, weights Weights) flo
 // any positive-weight goal without a typeable candidate makes the total +Inf.
 func score(bindings Layout, goals []Goal, weights Weights, missingPenalty float64) (float64, bool) {
 	total, feasible := 0.0, true
+	worst := 0.0
 	searches := make(map[string]string, len(goals))
 	for _, goal := range goals {
 		importance, ok := weights.Crafts[goal.Item]
@@ -178,10 +180,11 @@ func score(bindings Layout, goals []Goal, weights Weights, missingPenalty float6
 			feasible = false
 		} else {
 			total += importance * best
+			worst = math.Max(worst, importance*best)
 			searches[goal.Item] = sub
 		}
 	}
-	return total + groupCost(bindings, searches, weights), feasible
+	return total + weights.WorstCraftPenalty*worst + groupCost(bindings, searches, weights), feasible
 }
 
 // Cost combines weighted typing effort with unordered craft-group proximity.
@@ -190,4 +193,36 @@ func Cost(bindings Layout, goals []Goal, weights Weights) float64 {
 	total, _ := score(bindings, goals, weights, math.Inf(1))
 	editing, _ := newSequenceScorer(goals, weights).evaluate(bindings, false)
 	return total + editing
+}
+
+func multiplier(value *float64) float64 {
+	if value == nil {
+		return 1
+	}
+	return *value
+}
+
+// keyPairCost is shared by direct scoring and compiled group/optimizer tables.
+func keyPairCost(from, to string, weights Weights) float64 {
+	a, b := weights.Keys[from], weights.Keys[to]
+	base, ok := weights.Transitions[Transition{From: from, To: to}]
+	if !ok {
+		base = weights.DefaultTransitionPenalty
+		if a.Finger != "" && a.Finger == b.Finger {
+			base += weights.SameFingerPenalty
+		}
+	}
+	cost := multiplier(weights.TransitionWeight) * base
+	if weights.DistancePenalty > 0 || weights.LongReachPenalty > 0 {
+		distance := math.Hypot(a.X-b.X, a.Y-b.Y)
+		excess := math.Max(0, distance-weights.LongReachThreshold)
+		cost += weights.DistancePenalty*distance + weights.LongReachPenalty*excess*excess
+	}
+	if from != "Space" && to != "Space" {
+		cost += weights.RowChangePenalty * math.Abs(a.Y-b.Y)
+	}
+	if from != to && a.Finger != "" && a.Finger == b.Finger {
+		cost += weights.SameFingerMovementPenalty
+	}
+	return cost
 }

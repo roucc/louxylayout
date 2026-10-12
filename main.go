@@ -15,8 +15,12 @@ import (
 
 func main() {
 	profileName := flag.String("profile", profiles.Default, "profile name or path to a JSON profile")
+	optimizer := flag.String("optimizer", "annealing", "optimizer: annealing or priority")
 	listProfiles := flag.Bool("list-profiles", false, "list available profiles and exit")
 	flag.Parse()
+	if *optimizer != "annealing" && *optimizer != "priority" {
+		log.Fatal("unknown optimizer; use -optimizer annealing or -optimizer priority")
+	}
 	if flag.NArg() != 0 {
 		log.Fatal("unexpected positional arguments; use -profile <name-or-path>")
 	}
@@ -43,6 +47,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	options.Method = *optimizer
+	fmt.Printf("Optimizer: %s\n", *optimizer)
 	fmt.Printf("Profile: %s", *profileName)
 	if personal.Name != *profileName {
 		fmt.Printf(" (%s)", personal.Name)

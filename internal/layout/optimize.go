@@ -9,6 +9,7 @@ import (
 )
 
 type OptimizeOptions struct {
+	Method               string // "annealing" (default) or "priority"
 	Restarts             int
 	Iterations           int // attempted changes per restart
 	Seed                 int64
@@ -33,6 +34,12 @@ type Optimized struct {
 // It keeps every goal and uses all candidates. Results are heuristic, not a
 // guarantee of the global minimum. Equal-cost results prefer fewer characters.
 func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized, error) {
+	if options.Method == "priority" {
+		return OptimizePriority(goals, weights, options)
+	}
+	if options.Method != "" && options.Method != "annealing" {
+		return Optimized{}, fmt.Errorf("unknown optimizer %q; use annealing or priority", options.Method)
+	}
 	if options.EnableShiftLayer {
 		return OptimizeLayers(goals, weights, options)
 	}
@@ -74,7 +81,7 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 	if err != nil {
 		return Optimized{}, err
 	}
-	for _, penalty := range []float64{weights.SameFingerPenalty, weights.DefaultTransitionPenalty, weights.DistancePenalty, weights.FingerReusePenalty} {
+	for _, penalty := range []float64{weights.SameFingerPenalty, weights.DefaultTransitionPenalty, weights.DistancePenalty, weights.FingerReusePenalty, weights.LongReachPenalty, weights.LongReachThreshold, weights.RowChangePenalty, weights.SameFingerMovementPenalty, weights.WorstCraftPenalty, multiplier(weights.TransitionWeight), multiplier(weights.GroupProximityWeight), multiplier(weights.GroupSequenceWeight)} {
 		if penalty < 0 || math.IsNaN(penalty) || math.IsInf(penalty, 0) {
 			return Optimized{}, fmt.Errorf("penalties must be finite and nonnegative")
 		}
@@ -107,24 +114,21 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 	}
 	// Precompute transition distances once. Explicit overrides still receive
 	// the distance charge; the caller's weight maps are never modified.
-	if weights.DistancePenalty > 0 {
+	{
 		transitions := make(map[Transition]float64, len(weights.Keys)*len(weights.Keys))
-		for from, a := range weights.Keys {
-			for to, b := range weights.Keys {
-				pair := Transition{From: from, To: to}
-				penalty, ok := weights.Transitions[pair]
-				if !ok {
-					penalty = weights.DefaultTransitionPenalty
-					if a.Finger != "" && a.Finger == b.Finger {
-						penalty += weights.SameFingerPenalty
-					}
-				}
-				transitions[pair] = penalty + weights.DistancePenalty*math.Hypot(a.X-b.X, a.Y-b.Y)
+		for from := range weights.Keys {
+			for to := range weights.Keys {
+				transitions[Transition{From: from, To: to}] = keyPairCost(from, to, weights)
 			}
 		}
 		weights.Transitions = transitions
 		weights.DistancePenalty = 0
+		weights.LongReachPenalty = 0
+		weights.RowChangePenalty = 0
+		weights.SameFingerMovementPenalty = 0
+		weights.TransitionWeight = nil
 	}
+
 	// With positive efforts, a longer search containing another candidate is
 	// strictly more expensive among the allowed searches.
 	// For zero-effort keys, only prune when the shorter search wins any cost tie.
@@ -251,11 +255,12 @@ func Optimize(goals []Goal, weights Weights, options OptimizeOptions) (Optimized
 		}
 	}
 	for _, group := range weights.Groups {
-		missingPenalty += group.Priority * float64(max(0, len(group.Crafts)-1)) * maxDistance
+		missingPenalty += multiplier(weights.GroupProximityWeight) * group.Priority * float64(max(0, len(group.Crafts)-1)) * maxDistance
 		if weights.SearchEditing != nil {
-			missingPenalty += group.Priority * float64(len(group.Crafts)) * (float64(maxLength)*(maxEffort+maxTransition) + weights.FingerReusePenalty*float64(maxLength)*float64(max(0, maxLength-1))/2 + weights.SearchEditing.ShiftHome)
+			missingPenalty += multiplier(weights.GroupSequenceWeight) * group.Priority * float64(len(group.Crafts)) * (float64(maxLength)*(maxEffort+maxTransition) + weights.FingerReusePenalty*float64(maxLength)*float64(max(0, maxLength-1))/2 + weights.SearchEditing.ShiftHome)
 		}
 	}
+	missingPenalty *= 1 + weights.WorstCraftPenalty
 	evaluate := func(bindings Layout) (float64, bool) {
 		total, feasible := score(bindings, prepared, weights, missingPenalty)
 		editing, _ := sequence.evaluate(bindings, false)

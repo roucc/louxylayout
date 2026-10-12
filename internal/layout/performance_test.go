@@ -45,6 +45,18 @@ func profileFixture(tb testing.TB) ([]layout.Goal, layout.Weights, layout.Optimi
 }
 
 func BenchmarkOptimizeCraftGroups(b *testing.B) { benchmarkOptimizer(b, false, true) }
+func BenchmarkOptimizePriority(b *testing.B) {
+	goals, weights, options := profileFixture(b)
+	options.Method = "priority"
+	options.Restarts, options.Iterations = 1, 200
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := layout.Optimize(goals, weights, options); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkOptimizeShiftLayers(b *testing.B) { benchmarkOptimizer(b, true, true) }
 func BenchmarkCraftOrderConstraints(b *testing.B) {
 	b.Run("Free", func(b *testing.B) { benchmarkOptimizer(b, true, false) })

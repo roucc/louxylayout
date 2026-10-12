@@ -62,21 +62,21 @@ type sequenceGroup struct {
 const maxGroupCrafts = 10
 
 type sequenceScorer struct {
-	weights            Weights
-	texts              []string
-	groups             []sequenceGroup
-	costs              []float64
-	stamps             []uint64
-	generation         uint64
-	characters         []rune
-	textCharacters     [][]int
-	keyIDs             map[string]int
-	characterKeys      []int
-	efforts            []float64
-	fingers            []int
-	fingerCounts       []int
-	transitions        []float64
-	distances          []float64
+	weights        Weights
+	texts          []string
+	groups         []sequenceGroup
+	costs          []float64
+	stamps         []uint64
+	generation     uint64
+	characters     []rune
+	textCharacters [][]int
+	keyIDs         map[string]int
+	characterKeys  []int
+	efforts        []float64
+	fingers        []int
+	fingerCounts   []int
+	transitions    []float64
+
 	prefixCosts        []float64
 	invalid            bool
 	orderError         error
@@ -239,9 +239,6 @@ func (s *sequenceScorer) textCost(id int, bindings Layout) float64 {
 			}
 			if previous >= 0 {
 				pair := previous*len(s.efforts) + key
-				if s.weights.DistancePenalty > 0 {
-					cost += s.distances[pair]
-				}
 				cost += s.transitions[pair]
 			}
 			previous = key
@@ -410,7 +407,7 @@ func (s *sequenceScorer) evaluatePrepared(bindings Layout, report bool) (float64
 				best, bestIndex = value, c
 			}
 		}
-		total += group.group.Priority * best
+		total += multiplier(s.weights.GroupSequenceWeight) * group.group.Priority * best
 		if report && bestIndex >= 0 {
 			plan := GroupPlan{Name: group.group.Name, Priority: group.group.Priority, Cost: best}
 			for mask, c := fullMask, bestIndex; mask > 0; {
@@ -547,16 +544,7 @@ func (s *sequenceScorer) compileTyping() {
 	s.fingerCounts = make([]int, len(fingerIDs))
 	for _, from := range keys {
 		for _, to := range keys {
-			a, b := s.weights.Keys[from], s.weights.Keys[to]
-			penalty, ok := s.weights.Transitions[Transition{From: from, To: to}]
-			if !ok {
-				penalty = s.weights.DefaultTransitionPenalty
-				if b.Finger != "" && a.Finger == b.Finger {
-					penalty += s.weights.SameFingerPenalty
-				}
-			}
-			s.transitions = append(s.transitions, penalty)
-			s.distances = append(s.distances, s.weights.DistancePenalty*math.Hypot(a.X-b.X, a.Y-b.Y))
+			s.transitions = append(s.transitions, keyPairCost(from, to, s.weights))
 		}
 	}
 }

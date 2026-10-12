@@ -58,6 +58,7 @@ func bothLayersCost(bindings LayeredLayout, weights Weights) float64 {
 
 func layeredScore(bindings LayeredLayout, goals []Goal, weights Weights, missingPenalty float64) (float64, bool, []LayeredSearch) {
 	total, feasible := bothLayersCost(bindings, weights), true
+	worst := 0.0
 	choices := make([]LayeredSearch, 0, len(goals))
 	byItem := make(map[string]LayeredSearch, len(goals))
 	for _, goal := range goals {
@@ -71,6 +72,7 @@ func layeredScore(bindings LayeredLayout, goals []Goal, weights Weights, missing
 			feasible = false
 		} else {
 			total += importance * choice.Cost
+			worst = math.Max(worst, importance*choice.Cost)
 			byItem[goal.Item] = choice
 		}
 		choices = append(choices, choice)
@@ -95,11 +97,11 @@ func layeredScore(bindings LayeredLayout, goals []Goal, weights Weights, missing
 						distance += math.Hypot(first.X-second.X, first.Y-second.Y)
 					}
 				}
-				total += group.Priority * (2 / float64(len(active))) * distance / float64(len(from)*len(to))
+				total += multiplier(weights.GroupProximityWeight) * group.Priority * (2 / float64(len(active))) * distance / float64(len(from)*len(to))
 			}
 		}
 	}
-	return total, feasible, choices
+	return total + weights.WorstCraftPenalty*worst, feasible, choices
 }
 
 // LayeredCost uses the same physical-key costs on both layers, adding soft

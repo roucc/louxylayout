@@ -268,6 +268,29 @@ func TestAdditionalProfileVariantsProduceLayouts(t *testing.T) {
 			if len(result.Searches) != len(p.Goals) || result.ShiftBindings == nil {
 				t.Fatal("variant did not produce a complete two-layer layout")
 			}
+			t.Run("priority", func(t *testing.T) {
+				options.Method = "priority"
+				priority, err := layout.Optimize(goals, weights, options)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(priority.Searches) != len(p.Goals) || priority.ShiftBindings == nil {
+					t.Fatal("priority optimizer did not produce a complete layout")
+				}
+				for _, goal := range priority.Searches {
+					if allowed := p.PreferredSearches[goal.Item]; len(allowed) > 0 {
+						valid := false
+						for _, sub := range allowed {
+							if len(goal.Substrings) == 1 && goal.Substrings[0] == sub {
+								valid = true
+							}
+						}
+						if !valid {
+							t.Fatalf("priority optimizer ignored allowed searches: %+v", goal)
+						}
+					}
+				}
+			})
 		})
 	}
 }

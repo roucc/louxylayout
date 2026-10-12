@@ -25,7 +25,7 @@ func validateLayerWeights(weights Weights) error {
 			return fmt.Errorf("key position for %q must be finite", key)
 		}
 	}
-	for _, penalty := range []float64{weights.SameFingerPenalty, weights.DefaultTransitionPenalty, weights.DistancePenalty, weights.FingerReusePenalty, weights.LayerPreferencePenalty, weights.LayerSwitchPenalty} {
+	for _, penalty := range []float64{weights.SameFingerPenalty, weights.DefaultTransitionPenalty, weights.DistancePenalty, weights.FingerReusePenalty, weights.LayerPreferencePenalty, weights.LayerSwitchPenalty, weights.LongReachPenalty, weights.LongReachThreshold, weights.RowChangePenalty, weights.SameFingerMovementPenalty, weights.WorstCraftPenalty, multiplier(weights.TransitionWeight), multiplier(weights.GroupProximityWeight), multiplier(weights.GroupSequenceWeight)} {
 		if !validWeight(penalty) {
 			return fmt.Errorf("penalties must be finite and nonnegative")
 		}
@@ -235,11 +235,13 @@ func layeredMissingPenalty(goals []Goal, weights Weights) float64 {
 			maxDistance = math.Max(maxDistance, math.Hypot(key.X-other.X, key.Y-other.Y))
 		}
 	}
-	for _, cost := range weights.Transitions {
-		maxTransition = math.Max(maxTransition, cost)
+	for from := range weights.Keys {
+		for to := range weights.Keys {
+			maxTransition = math.Max(maxTransition, keyPairCost(from, to, weights))
+		}
 	}
 	length := float64(maxLength)
-	bound := length*(maxEffort+maxTransition+weights.DistancePenalty*maxDistance) + weights.FingerReusePenalty*length*float64(max(0, maxLength-1))/2 + weights.LayerPreferencePenalty + weights.LayerSwitchPenalty
+	bound := length*(maxEffort+maxTransition) + weights.FingerReusePenalty*length*float64(max(0, maxLength-1))/2 + weights.LayerPreferencePenalty + weights.LayerSwitchPenalty
 	result := 1.0
 	for _, goal := range goals {
 		result += craftImportance(goal.Item, weights) * bound
@@ -254,12 +256,12 @@ func layeredMissingPenalty(goals []Goal, weights Weights) float64 {
 		for _, item := range group.Crafts {
 			maxImportance = math.Max(maxImportance, craftImportance(item, weights))
 		}
-		result += group.Priority * size * (maxImportance*editBound + maxDistance)
+		result += group.Priority * size * (multiplier(weights.GroupSequenceWeight)*maxImportance*editBound + multiplier(weights.GroupProximityWeight)*maxDistance)
 	}
 	for _, penalty := range weights.PreferBothLayers {
 		result += 2 * penalty
 	}
-	return result
+	return result * (1 + weights.WorstCraftPenalty)
 }
 
 // OptimizeLayers explores independent assignments on both layers, including
@@ -410,6 +412,12 @@ func OptimizeLayers(goals []Goal, weights Weights, options OptimizeOptions) (Opt
 			}
 		}
 	}
+	return finishLayered(best, goals, weights, fixed, sequence), nil
+}
+
+// finishLayered is shared by both optimizers so reports and unused-key cleanup
+// have identical scoring and layer behaviour.
+func finishLayered(best Optimized, goals []Goal, weights Weights, fixed [2]Layout, sequence *sequenceScorer) Optimized {
 	layered := LayeredLayout{NonShift: best.Bindings, Shift: best.ShiftBindings}
 	_, _, best.LayeredSearches = layeredScore(layered, goals, weights, math.Inf(1))
 	_, best.GroupPlans = sequence.evaluateLayers(layered, true)
@@ -453,5 +461,5 @@ func OptimizeLayers(goals []Goal, weights Weights, options OptimizeOptions) (Opt
 			}
 		}
 	}
-	return best, nil
+	return best
 }
